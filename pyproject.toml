@@ -14,6 +14,9 @@ requires-python = ">=3.10,<4.0"
 dependencies = [
 ]
 
+[project.scripts]
+ngpb4py-setup = "ngpb4py.setup:main"
+
 [project.urls]  # https://packaging.python.org/en/latest/specifications/well-known-project-urls/#well-known-labels
 homepage = "https://github.com/pedrishi/ngpb4py"
 source = "https://github.com/pedrishi/ngpb4py"

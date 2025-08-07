@@ -10,14 +10,12 @@ ENV UV_PROJECT_ENVIRONMENT=$VIRTUAL_ENV
 # Tell Git that the workspace is safe to avoid 'detected dubious ownership in repository' warnings.
 RUN git config --system --add safe.directory '*'
 
-# Create a non-root user and give it passwordless sudo access [1].
-# [1] https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user
 RUN --mount=type=cache,target=/var/cache/apt/ \
     --mount=type=cache,target=/var/lib/apt/ \
     groupadd --gid 1000 user && \
     useradd --create-home --no-log-init --gid 1000 --uid 1000 --shell /usr/bin/bash user && \
     chown user:user /opt/ && \
-    apt-get update && apt-get install --no-install-recommends --yes sudo && \
+    apt-get update && apt-get install --no-install-recommends --yes sudo rpm2cpio cpio && \
     echo 'user ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/user && chmod 0440 /etc/sudoers.d/user
 USER user
 
