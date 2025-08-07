@@ -1,0 +1,12 @@
+_commit: v1.5.1
+_src_path: gh:superlinear-ai/substrate
+author_email: pedroreis@campus.ul.pt
+author_name: Pedro B. P. S. Reis
+project_description: Pythonic wrapper for [NextGenPB](https://github.com/concept-lab/NextGenPB)
+project_name: ngpb4py
+project_type: package
+project_url: https://github.com/pedrishi/ngpb4py
+python_version: '3.10'
+typing: optional
+with_conventional_commits: true
+with_typer_cli: false
