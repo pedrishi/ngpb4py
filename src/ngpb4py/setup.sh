@@ -39,12 +39,10 @@ if command -v apptainer &>/dev/null; then
 	fi
 else
 	echo "Apptainer not found. Installing..."
+
+	# TODO: Add missing code to implement the functionality.
+	exit
 fi
-
-
-# Install Apptainer unprivileged from pre-built binaries
-echo "Installing Apptainer unprivileged from pre-built binaries..."
-curl -s https://raw.githubusercontent.com/apptainer/apptainer/main/tools/install-unprivileged.sh | bash -s - install-dir
 
 
 INSTALLED_VERSION=$(apptainer --version | awk '{print $2}')

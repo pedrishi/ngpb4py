@@ -67,3 +67,6 @@ uv.lock
 
 # VS Code
 .vscode/
+
+# Apptainer Installation
+apptainer/
