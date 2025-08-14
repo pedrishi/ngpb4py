@@ -3,6 +3,11 @@ Apptainer execution wrapper for NextGenPB simulations.
 
 This module provides a lightweight wrapper around Apptainer container execution
 for running NextGenPB (ngpb) simulations in a containerized environment.
+
+NGPB CLI Argument Collection:
+--prmfile
+--pqrfile
+> run.log
 """
 
 import logging
@@ -21,46 +26,94 @@ class ApptainerExecutor:
     """
 
     APPTAINER_KNOWN_ARGS = {
+        # Global options
+        "build-config",
+        "config",
+        "debug",
+        "help",
+        "nocolor",
+        "quiet",
+        "silent",
+        "verbose",
+        "version",
+        # exec command specific options
+        "add-caps",
+        "allow-setuid",
+        "app",
+        "apply-cgroups",
         "bind",
+        "blkio-weight",
+        "blkio-weight-device",
+        "boot",
         "cleanenv",
+        "compat",
+        "contain",
         "containall",
+        "cpu-shares",
+        "cpus",
+        "cpuset-cpus",
+        "cpuset-mems",
+        "device",
+        "device-cgroup-rule",
+        "disable-cache",
+        "dns",
+        "docker-login",
+        "drop-caps",
         "env",
         "env-file",
         "fakeroot",
+        "fusemount",
         "home",
         "hostname",
+        "ipc",
         "keep-privs",
+        "memory",
+        "memory-reservation",
+        "memory-swap",
+        "mount",
         "net",
         "network",
+        "network-args",
+        "no-eval",
         "no-home",
+        "no-https",
         "no-init",
+        "no-mount",
         "no-privs",
+        "no-umask",
         "nv",
+        "oci",
         "overlay",
+        "passwd",
+        "pem-path",
+        "pid",
+        "pids-limit",
         "pwd",
         "rocm",
         "scratch",
         "security",
+        "shell",
+        "sif-fuse",
+        "tmp",
+        "tmpfs",
+        "underlay",
+        "unsquash",
+        "user",
         "userns",
         "uts",
+        "vm",
+        "vm-cpu",
+        "vm-err",
+        "vm-ip",
+        "vm-ram",
         "workdir",
         "writable",
         "writable-tmpfs",
     }
 
-    NGPB_KNOWN_ARGS = {
-        "prmfile",
-        "output",
-        "verbose",
-        "quiet",
-        "help",
-        "version",
-        "config",
-        "logfile",
-        "threads",
-        "memory",
-    }
+    NGPB_KNOWN_ARGS = {"prmfile", "pqrfile", "run_log"}
 
+    # collecting the ngpb input parameters from the documentation:
     def __init__(
         self,
         sif_path: str | Path,
@@ -188,6 +241,7 @@ class ApptainerExecutor:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                shell=False,
             )
             if result.returncode != 0:
                 error_msg = (
@@ -468,8 +522,8 @@ class ApptainerExecutor:
         self.validate_all_arguments(**kwargs)
 
         # Sort arguments
-        apptainer_args, unknown_apptainer = self.sort_apptainer_kwargs(**kwargs)
-        ngpb_args, unknown_ngpb = self.sort_ngpb_kwargs(**kwargs)
+        apptainer_args, _ = self.sort_apptainer_kwargs(**kwargs)
+        ngpb_args, _ = self.sort_ngpb_kwargs(**kwargs)
 
         # Build command
         cmd = self.build_command(apptainer_args, ngpb_args)
@@ -493,6 +547,7 @@ class ApptainerExecutor:
                 timeout=self.timeout,
                 env=exec_env,
                 cwd=self.workdir,
+                shell=False,
             )
 
             # Write logs
