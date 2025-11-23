@@ -80,6 +80,7 @@ class TestParameterValidation:
             "rand_center",
             "refine_box",
             "linearized",
+            "calc_coulombic",
             "stern_layer_surf",
             "atoms_write",
             "potential_map",

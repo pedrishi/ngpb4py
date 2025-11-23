@@ -222,6 +222,7 @@ class NGPB:
             "rand_center",
             "refine_box",
             "linearized",
+            "calc_coulombic",
             "stern_layer_surf",
             "atoms_write",
             "potential_map",
@@ -242,12 +243,6 @@ class NGPB:
         if param_name == "calc_energy" and param_value not in (0, 1, 2):
             raise ParameterError(
                 f"calc_energy must be 0, 1, or 2, got {param_value}"
-            )
-
-        # Coulombic calculation validation
-        if param_name == "calc_coulombic" and param_value not in (0, 1):
-            raise ParameterError(
-                f"calc_coulombic must be 0 or 1, got {param_value}"
             )
 
         # Surface type validation
