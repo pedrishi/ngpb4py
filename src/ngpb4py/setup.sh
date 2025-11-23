@@ -80,6 +80,9 @@ function main() {
 	fi
 
 	# Use official Apptainer unprivileged installation script
+	# Note: This downloads and executes a script from the official Apptainer repository.
+	# Users who require additional security validation can download and inspect the script
+	# manually from: https://github.com/apptainer/apptainer/blob/main/tools/install-unprivileged.sh
 	curl -s https://raw.githubusercontent.com/apptainer/apptainer/main/tools/install-unprivileged.sh | \
 		bash -s - "$INSTALL_DIR"
 

@@ -69,7 +69,6 @@ def test_python_wrapper_calls_bash_script(mock_run: MagicMock) -> None:
     """Test that the Python wrapper calls the bash script."""
     mock_run.return_value = MagicMock(returncode=0)
 
-
     exit_code = main()
 
     assert exit_code == 0
@@ -84,7 +83,6 @@ def test_python_wrapper_calls_bash_script(mock_run: MagicMock) -> None:
 def test_python_wrapper_propagates_error_code(mock_run: MagicMock) -> None:
     """Test that the Python wrapper propagates error codes."""
     mock_run.return_value = MagicMock(returncode=1)
-
 
     exit_code = main()
 
