@@ -20,6 +20,31 @@ Pythonic wrapper for [NextGenPB](https://github.com/concept-lab/NextGenPB)
 pip install ngpb4py                         # Python ≥3.10
 ```
 
+### Apptainer Setup
+
+Apptainer ≥ 1.2 is required to run the containerized NextGenPB simulations. You can install it using the automated setup script:
+
+```bash
+ngpb4py-setup
+```
+
+This will install Apptainer to `~/.local` (or `$APPTAINER_INSTALL_DIR` if set) if it's not already available.
+
+**Dependencies**: The installer requires `rpm2cpio` and `cpio`. Install them using your system package manager:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install rpm2cpio cpio
+
+# RHEL/CentOS/Fedora
+sudo yum install rpm cpio
+
+# macOS
+brew install rpm2cpio cpio
+```
+
+Alternatively, you can install Apptainer manually from [apptainer.org](https://apptainer.org/docs/admin/main/installation.html).
+
 See [examples/basic_usage.ipynb](examples/basic_usage.ipynb) for a full walkthrough
 
 ## 🗄️ Project layout
