@@ -30,7 +30,7 @@ class PhiSurfParser:
         coordinates = []
         potentials = []
 
-        with filepath.open() as f:
+        with filepath.open(encoding="utf-8") as f:
             for raw_line in f:
                 line = raw_line.strip()
                 if not line or line.startswith("#"):
@@ -75,7 +75,7 @@ class PhiNodesParser:
         coordinates = []
         potentials = []
 
-        with filepath.open() as f:
+        with filepath.open(encoding="utf-8") as f:
             for raw_line in f:
                 line = raw_line.strip()
                 if not line or line.startswith("#"):
@@ -122,7 +122,7 @@ class PhiOnAtomsParser:
         coordinates = []
         potentials = []
 
-        with filepath.open() as f:
+        with filepath.open(encoding="utf-8") as f:
             for raw_line in f:
                 line = raw_line.strip()
                 if not line or line.startswith("#"):
@@ -131,7 +131,8 @@ class PhiOnAtomsParser:
                 parts = line.split()
                 if len(parts) >= self._MIN_PARTS:
                     idx = int(parts[0])
-                    x, y, z, phi = map(float, parts[1 : self._MIN_PARTS])
+                    # Extract x, y, z, phi from parts[1:5] (indices 1, 2, 3, 4)
+                    x, y, z, phi = map(float, parts[1:5])
                     atom_indices.append(idx)
                     coordinates.append([x, y, z])
                     potentials.append(phi)
@@ -169,7 +170,7 @@ class LogParser:
             - 'raw_log': full log text
         """
         filepath = Path(filepath)
-        log_text = filepath.read_text()
+        log_text = filepath.read_text(encoding="utf-8")
 
         result = {
             "system_info": {},
