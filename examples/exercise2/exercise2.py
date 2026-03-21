@@ -8,18 +8,10 @@ options_prm = workdir / "options.prm"
 inputs = NgpbInputs(
     prmfile=options_prm,
     pqrfile=None,
-    aux_files=[
-        workdir / "1CCM.pdb",
-        workdir / "charge.crg",
-        workdir / "radius.siz",
-    ],
+    aux_files=[workdir / "1CCM.pdb", workdir / "charge.crg", workdir / "radius.siz"],
 )
 result = NgpbRunner(nproc=4).run(
-    config=NgpbConfig.defaults(),
-    pqr=None,
-    workdir=str(workdir),
-    inputs=inputs,
-    verbose=3,
+    config=NgpbConfig.defaults(), pqr=None, workdir=str(workdir), inputs=inputs, verbose=3
 )
 
 print(result.metrics)

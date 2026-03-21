@@ -1,8 +1,9 @@
 from pathlib import Path
 
+from examples.exercise4.exercise4 import build_inputs
+
 from ngpb4py import NgpbConfig
 from ngpb4py.io.prm import load_prm
-from examples.exercise4.exercise4 import build_inputs
 
 
 def test_prm_round_trip(tmp_path):

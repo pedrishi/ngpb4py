@@ -48,3 +48,7 @@ ngpb.stdout.log
 *.vtu
 *.pvtu
 phi_*.txt
+
+# Docs and Reports
+site/
+reports/

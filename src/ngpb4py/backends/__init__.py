@@ -1,8 +1,4 @@
-from .base import NgpbBackend, ExecutionResult
+from .base import ExecutionResult, NgpbBackend
 from .container import ContainerBackend
 
-__all__ = [
-    "NgpbBackend",
-    "ExecutionResult",
-    "ContainerBackend",
-]
+__all__ = ["ContainerBackend", "ExecutionResult", "NgpbBackend"]
