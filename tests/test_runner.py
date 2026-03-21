@@ -5,6 +5,7 @@ import pytest
 from ngpb4py import NgpbConfig, NgpbRunner
 from ngpb4py import runner as runner_module
 from ngpb4py.backends.base import ExecutionResult
+from ngpb4py.backends.container import ContainerBackend
 from ngpb4py.inputs import NgpbInputs
 
 
@@ -16,7 +17,9 @@ class RecordingBackend:
         self.workdirs: list[Path] = []
         self.inputs: list[NgpbInputs] = []
 
-    def run(self, inputs: NgpbInputs, workdir: Path, nproc: int, ngpb_binary: str) -> ExecutionResult:
+    def run(
+        self, inputs: NgpbInputs, workdir: Path, nproc: int, ngpb_binary: str
+    ) -> ExecutionResult:
         self.workdirs.append(workdir)
         self.inputs.append(inputs)
 
@@ -62,10 +65,7 @@ def test_runner_keeps_workdir_on_error(tmp_path):
 
     with pytest.raises(RuntimeError, match="backend failure"):
         runner.run(
-            config=NgpbConfig.defaults(),
-            pqr=None,
-            workdir=str(tmp_path),
-            collect_version=False,
+            config=NgpbConfig.defaults(), pqr=None, workdir=str(tmp_path), collect_version=False
         )
 
     kept_dirs = list(tmp_path.iterdir())
@@ -129,19 +129,20 @@ def test_runner_verbose_override_updates_existing_handler_level(monkeypatch):
     runner_module._LOGGER.handlers.clear()
 
     runner = NgpbRunner(backend=RecordingBackend(), verbosity=0)
-    runner.run(
-        config=NgpbConfig.defaults(),
-        pqr=None,
-        workdir="/tmp",
-        collect_version=False,
-    )
+    runner.run(config=NgpbConfig.defaults(), pqr=None, workdir="/tmp", collect_version=False)
     assert runner_module._LOGGER.handlers[0].level == runner_module.logging.WARNING
 
     runner.run(
-        config=NgpbConfig.defaults(),
-        pqr=None,
-        workdir="/tmp",
-        collect_version=False,
-        verbose=3,
+        config=NgpbConfig.defaults(), pqr=None, workdir="/tmp", collect_version=False, verbose=3
     )
     assert runner_module._LOGGER.handlers[0].level == runner_module.logging.DEBUG
+
+
+def test_runner_passes_custom_apptainer_path_to_container_backend():
+    custom_path = "/opt/apptainer/bin/apptainer"
+    runner = NgpbRunner(apptainer_path=custom_path)
+
+    backend = runner._make_backend()
+
+    assert isinstance(backend, ContainerBackend)
+    assert backend.apptainer_path == custom_path

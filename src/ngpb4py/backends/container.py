@@ -11,14 +11,14 @@ import tempfile
 import threading
 import time
 import uuid
-from urllib.parse import urlparse
-from urllib.request import urlopen
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, List, Optional
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
-from .base import ExecutionResult
 from ..inputs import NgpbInputs
+from .base import ExecutionResult
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,25 +27,21 @@ _LOGGER = logging.getLogger(__name__)
 class ContainerBackend:
     name: str = "container"
     image: str = (
-        "https://github.com/concept-lab/NextGenPB/releases/download/"
-        "NextGenPB_v1.0.0/NextGenPB.sif"
+        "https://github.com/concept-lab/NextGenPB/releases/download/NextGenPB_v1.0.0/NextGenPB.sif"
     )
-    runtime: Optional[str] = "apptainer"
-    extra_args: Optional[List[str]] = None
-    exec_args: Optional[List[str]] = None
+    runtime: str | None = "apptainer"
+    apptainer_path: str | None = None
+    extra_args: list[str] | None = None
+    exec_args: list[str] | None = None
     stream_output: bool = False
 
     def run(
-        self,
-        inputs: NgpbInputs,
-        workdir: Path,
-        nproc: int,
-        ngpb_binary: str,
+        self, inputs: NgpbInputs, workdir: Path, nproc: int, ngpb_binary: str
     ) -> ExecutionResult:
-        runtime = self.runtime or _detect_runtime()
+        runtime = self.runtime or _detect_runtime(self.apptainer_path)
         if not runtime:
             raise RuntimeError("No container runtime detected (docker or apptainer)")
-        _assert_runtime_available(runtime)
+        runtime_cmd = _resolve_runtime_command(runtime, self.apptainer_path)
 
         resolved_image = _prepare_container_image(runtime, self.image)
 
@@ -53,6 +49,7 @@ class ContainerBackend:
         runtime_args = _runtime_args(runtime, nproc)
         base_cmd = _container_base_cmd(
             runtime,
+            runtime_cmd,
             resolved_image,
             mount_arg,
             workdir_in_container,
@@ -92,10 +89,7 @@ def _prepare_container_image(runtime: str, image: str) -> str:
         return image
 
     cache_dir = Path(
-        os.environ.get(
-            "NGPB_CONTAINER_CACHE_DIR",
-            str(Path.home() / ".cache" / "ngpb4py"),
-        )
+        os.environ.get("NGPB_CONTAINER_CACHE_DIR", str(Path.home() / ".cache" / "ngpb4py"))
     ).expanduser()
     cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -123,9 +117,7 @@ def _download_cached_image(url: str, destination: Path) -> None:
 
 
 def _download_with_progress(url: str, destination: Path) -> None:
-    tmp_destination = destination.with_suffix(
-        destination.suffix + f".{uuid.uuid4().hex}.part"
-    )
+    tmp_destination = destination.with_suffix(destination.suffix + f".{uuid.uuid4().hex}.part")
     stderr_is_tty = hasattr(sys.stderr, "isatty") and bool(sys.stderr.isatty())
     printed_non_tty = False
 
@@ -145,9 +137,7 @@ def _download_with_progress(url: str, destination: Path) -> None:
                 if total_bytes:
                     progress_text = _format_progress_bar(downloaded_bytes, total_bytes)
                 else:
-                    progress_text = (
-                        f"Downloading container image: {_format_size(downloaded_bytes)}"
-                    )
+                    progress_text = f"Downloading container image: {_format_size(downloaded_bytes)}"
 
                 if stderr_is_tty:
                     sys.stderr.write(f"\r{progress_text}")
@@ -165,9 +155,7 @@ def _download_with_progress(url: str, destination: Path) -> None:
             )
             sys.stderr.flush()
         else:
-            sys.stderr.write(
-                f"Downloaded container image: {_format_size(downloaded_bytes)}\n"
-            )
+            sys.stderr.write(f"Downloaded container image: {_format_size(downloaded_bytes)}\n")
             sys.stderr.flush()
         tmp_destination.replace(destination)
     finally:
@@ -175,7 +163,9 @@ def _download_with_progress(url: str, destination: Path) -> None:
 
 
 @contextlib.contextmanager
-def _path_lock(path: Path, timeout_s: float = 300.0, poll_interval_s: float = 0.1) -> Iterator[None]:
+def _path_lock(
+    path: Path, timeout_s: float = 300.0, poll_interval_s: float = 0.1
+) -> Iterator[None]:
     lock_path = path.with_suffix(path.suffix + ".lock")
     deadline = time.monotonic() + timeout_s
 
@@ -211,7 +201,10 @@ def _format_size(size_bytes: int) -> str:
     return f"{mib:.1f} MiB"
 
 
-def _detect_runtime() -> Optional[str]:
+def _detect_runtime(apptainer_path: str | None = None) -> str | None:
+    if apptainer_path:
+        _validate_apptainer_path(apptainer_path)
+        return "apptainer"
     if shutil.which("apptainer"):
         return "apptainer"
     if shutil.which("singularity"):
@@ -221,21 +214,41 @@ def _detect_runtime() -> Optional[str]:
     return None
 
 
-def _assert_runtime_available(runtime: str) -> None:
+def _resolve_runtime_command(runtime: str, apptainer_path: str | None = None) -> str:
     if runtime == "docker" and not shutil.which("docker"):
         raise RuntimeError("Docker runtime requested but docker was not found in PATH")
-    if runtime == "apptainer" and not shutil.which("apptainer"):
+    if runtime == "docker":
+        return "docker"
+    if runtime == "apptainer":
+        if apptainer_path:
+            return _validate_apptainer_path(apptainer_path)
+        if shutil.which("apptainer"):
+            return "apptainer"
         _ensure_apptainer_available()
+        return "apptainer"
     if runtime == "singularity" and not shutil.which("singularity"):
+        raise RuntimeError("Singularity runtime requested but singularity was not found in PATH")
+    if runtime == "singularity":
+        return "singularity"
+    raise RuntimeError(f"Unsupported runtime: {runtime}")
+
+
+def _validate_apptainer_path(apptainer_path: str) -> str:
+    path = Path(apptainer_path).expanduser()
+    if not path.is_absolute():
+        raise RuntimeError("Custom Apptainer path must be an absolute path to the executable")
+    if not path.exists():
+        raise RuntimeError(f"Custom Apptainer path does not exist: {path}")
+    if path.is_dir():
         raise RuntimeError(
-            "Singularity runtime requested but singularity was not found in PATH"
+            f"Custom Apptainer path points to a directory, not an executable: {path}"
         )
+    if not os.access(path, os.X_OK):
+        raise RuntimeError(f"Custom Apptainer path is not executable: {path}")
+    return str(path)
 
 
 def _ensure_apptainer_available() -> None:
-    if shutil.which("apptainer"):
-        return
-
     if not _confirm_apptainer_install():
         raise RuntimeError(
             "Apptainer is not installed. Installation was declined; please install it "
@@ -265,14 +278,8 @@ def _ensure_apptainer_available() -> None:
         install_script = temp_path / "install-apptainer.sh"
         script_url = "https://raw.githubusercontent.com/apptainer/apptainer/main/tools/install-unprivileged.sh"
 
-        subprocess.run(
-            ["curl", "-s", "-o", str(install_script), script_url],
-            check=True,
-        )
-        subprocess.run(
-            ["bash", str(install_script), str(local_prefix)],
-            check=True,
-        )
+        subprocess.run(["curl", "-s", "-o", str(install_script), script_url], check=True)
+        subprocess.run(["bash", str(install_script), str(local_prefix)], check=True)
 
     path_bin = str(local_prefix / "bin")
     os.environ["PATH"] = f"{path_bin}:{os.environ.get('PATH', '')}"
@@ -318,9 +325,7 @@ def _resolve_install_defaults() -> Path:
 
     try:
         change = (
-            input(
-                "Use the default Apptainer install settings (version and prefix)? [Y/n]: "
-            )
+            input("Use the default Apptainer install settings (version and prefix)? [Y/n]: ")
             .strip()
             .lower()
         )
@@ -347,7 +352,7 @@ def _should_prompt_defaults() -> bool:
     return sys.stdin.isatty()
 
 
-def _missing_dependencies(dependencies: List[str]) -> List[str]:
+def _missing_dependencies(dependencies: list[str]) -> list[str]:
     return [dep for dep in dependencies if not shutil.which(dep)]
 
 
@@ -376,7 +381,7 @@ def _dependency_install_hint() -> str:
     )
 
 
-def _read_os_release() -> tuple[Optional[str], Optional[str]]:
+def _read_os_release() -> tuple[str | None, str | None]:
     try:
         data = Path("/etc/os-release").read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -403,29 +408,21 @@ def _container_mount(runtime: str, workdir: Path) -> tuple[str, str]:
 
 def _container_base_cmd(
     runtime: str,
+    runtime_cmd: str,
     image: str,
     mount: str,
     workdir: str,
-    runtime_args: List[str],
-    exec_args: Optional[List[str]] = None,
-) -> List[str]:
+    runtime_args: list[str],
+    exec_args: list[str] | None = None,
+) -> list[str]:
     if runtime == "docker":
-        return (
-            ["docker", "run", "--rm"]
-            + runtime_args
-            + ["-v", mount, "-w", workdir, image]
-        )
+        return [runtime_cmd, "run", "--rm"] + runtime_args + ["-v", mount, "-w", workdir, image]
     if runtime in {"apptainer", "singularity"}:
-        return (
-            [runtime, "exec"]
-            + (exec_args or [])
-            + runtime_args
-            + ["--bind", mount, image]
-        )
+        return [runtime_cmd, "exec"] + (exec_args or []) + runtime_args + ["--bind", mount, image]
     raise RuntimeError(f"Unsupported runtime: {runtime}")
 
 
-def _runtime_args(runtime: str, nproc: int) -> List[str]:
+def _runtime_args(runtime: str, nproc: int) -> list[str]:
     if runtime == "docker":
         return ["--cpus", str(nproc), "--env", f"NGPB_NPROC={nproc}"]
     if runtime in {"apptainer", "singularity"}:
@@ -433,12 +430,10 @@ def _runtime_args(runtime: str, nproc: int) -> List[str]:
     return []
 
 
-def _container_digest(runtime: str, image: str) -> Optional[str]:
+def _container_digest(runtime: str, image: str) -> str | None:
     try:
         if runtime == "docker":
-            output = subprocess.check_output(
-                ["docker", "inspect", "--format", "{{.Id}}", image]
-            )
+            output = subprocess.check_output(["docker", "inspect", "--format", "{{.Id}}", image])
             return output.decode().strip()
         if runtime in {"apptainer", "singularity"}:
             return None
@@ -448,20 +443,12 @@ def _container_digest(runtime: str, image: str) -> Optional[str]:
 
 
 def _execute_command(
-    command: List[str],
-    workdir: Path,
-    stdout_path: Path,
-    stderr_path: Path,
-    stream_output: bool,
+    command: list[str], workdir: Path, stdout_path: Path, stderr_path: Path, stream_output: bool
 ) -> None:
     with stdout_path.open("w") as stdout_file, stderr_path.open("w") as stderr_file:
         if not stream_output:
             completed = subprocess.run(
-                command,
-                cwd=workdir,
-                stdout=stdout_file,
-                stderr=stderr_file,
-                check=False,
+                command, cwd=workdir, stdout=stdout_file, stderr=stderr_file, check=False
             )
             if completed.returncode != 0:
                 raise subprocess.CalledProcessError(completed.returncode, command)
@@ -479,14 +466,10 @@ def _execute_command(
             raise RuntimeError("Failed to capture process output streams")
 
         stdout_thread = threading.Thread(
-            target=_tee_stream,
-            args=(process.stdout, stdout_file, sys.stdout),
-            daemon=True,
+            target=_tee_stream, args=(process.stdout, stdout_file, sys.stdout), daemon=True
         )
         stderr_thread = threading.Thread(
-            target=_tee_stream,
-            args=(process.stderr, stderr_file, sys.stderr),
-            daemon=True,
+            target=_tee_stream, args=(process.stderr, stderr_file, sys.stderr), daemon=True
         )
         stdout_thread.start()
         stderr_thread.start()
@@ -507,5 +490,5 @@ def _tee_stream(source, sink, cli_stream) -> None:
     source.close()
 
 
-def _guess_outputs(workdir: Path) -> List[Path]:
+def _guess_outputs(workdir: Path) -> list[Path]:
     return sorted(workdir.glob("*"))

@@ -19,11 +19,7 @@ def build_inputs(variant: str = DEFAULT_VARIANT) -> NgpbInputs:
     return NgpbInputs(
         prmfile=workdir / f"{variant}.prm",
         pqrfile=None,
-        aux_files=[
-            workdir / "1CCM.pdb",
-            workdir / "radius.siz",
-            workdir / "charge.crg",
-        ],
+        aux_files=[workdir / "1CCM.pdb", workdir / "radius.siz", workdir / "charge.crg"],
     )
 
 
@@ -34,11 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     workdir = Path(__file__).resolve().parent
 
     result = NgpbRunner(nproc=4).run(
-        config=NgpbConfig.defaults(),
-        pqr=None,
-        workdir=str(workdir),
-        inputs=inputs,
-        verbose=3,
+        config=NgpbConfig.defaults(), pqr=None, workdir=str(workdir), inputs=inputs, verbose=3
     )
     print(result.metrics)
     return 0

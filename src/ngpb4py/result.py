@@ -2,27 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
 
-from .io.logs import (
-    BoxBounds,
-    DomainInfo,
-    ElectrostaticEnergy,
-    GridBuildInfo,
-    GridSubdivisions,
-    ParsedLog,
-    SolverInfo,
-    SurfaceBuildInfo,
-    SystemInfo,
-    AxisBounds,
-    parse_log,
-)
+from .io.logs import ParsedLog, parse_log
 
 
 @dataclass
 class PotentialSampleSet:
-    coordinates: List[List[float]] = field(default_factory=list)
-    potentials: List[float] = field(default_factory=list)
+    coordinates: list[list[float]] = field(default_factory=list)
+    potentials: list[float] = field(default_factory=list)
 
 
 @dataclass
@@ -31,15 +18,15 @@ class NgpbResult:
     scratch_dir: Path
     workdir: Path
     kept_files: bool
-    command: List[str]
+    command: list[str]
     stdout_path: Path
     stderr_path: Path
-    output_paths: List[Path] = field(default_factory=list)
-    parsed_outputs: Dict[str, PotentialSampleSet] = field(default_factory=dict)
+    output_paths: list[Path] = field(default_factory=list)
+    parsed_outputs: dict[str, PotentialSampleSet] = field(default_factory=dict)
     log: ParsedLog = field(default_factory=ParsedLog)
-    metrics: Dict[str, float] = field(default_factory=dict)
-    log_excerpt: Optional[str] = None
-    provenance: Dict[str, str] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
+    log_excerpt: str | None = None
+    provenance: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_logs(
@@ -48,13 +35,13 @@ class NgpbResult:
         scratch_dir: Path,
         workdir: Path,
         kept_files: bool,
-        command: List[str],
+        command: list[str],
         stdout_path: Path,
         stderr_path: Path,
-        output_paths: List[Path],
-        provenance: Dict[str, str],
+        output_paths: list[Path],
+        provenance: dict[str, str],
         excerpt_lines: int = 80,
-    ) -> "NgpbResult":
+    ) -> NgpbResult:
         stdout_text = stdout_path.read_text(errors="replace") if stdout_path.exists() else ""
         parsed_log = parse_log(stdout_text)
         excerpt = "\n".join(stdout_text.splitlines()[-excerpt_lines:]) if stdout_text else None
@@ -75,15 +62,11 @@ class NgpbResult:
         )
 
 
-_PARSED_OUTPUT_FILENAMES = {
-    "phi_surf.txt",
-    "phi_nodes.txt",
-    "phi_on_atoms.txt",
-}
+_PARSED_OUTPUT_FILENAMES = {"phi_surf.txt", "phi_nodes.txt", "phi_on_atoms.txt"}
 
 
-def _parse_known_output_files(output_paths: List[Path]) -> Dict[str, List[float]]:
-    parsed_outputs: Dict[str, PotentialSampleSet] = {}
+def _parse_known_output_files(output_paths: list[Path]) -> dict[str, PotentialSampleSet]:
+    parsed_outputs: dict[str, PotentialSampleSet] = {}
 
     for path in output_paths:
         if path.name not in _PARSED_OUTPUT_FILENAMES or not path.is_file():
@@ -94,8 +77,8 @@ def _parse_known_output_files(output_paths: List[Path]) -> Dict[str, List[float]
 
 
 def _parse_float_values(path: Path) -> PotentialSampleSet:
-    coordinates: List[List[float]] = []
-    potentials: List[float] = []
+    coordinates: list[list[float]] = []
+    potentials: list[float] = []
 
     for line in path.read_text(errors="replace").splitlines():
         stripped = line.strip()

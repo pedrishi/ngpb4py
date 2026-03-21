@@ -162,14 +162,8 @@ def test_ngpb_result_parses_known_output_files(tmp_path):
         provenance={"backend": "test"},
     )
 
-    assert result.parsed_outputs["phi_surf.txt"].coordinates == [
-        [0.0, 1.0, 2.0],
-        [1.5, 2.5, 3.5],
-    ]
+    assert result.parsed_outputs["phi_surf.txt"].coordinates == [[0.0, 1.0, 2.0], [1.5, 2.5, 3.5]]
     assert result.parsed_outputs["phi_surf.txt"].potentials == [3.0, 4.5]
-    assert result.parsed_outputs["phi_nodes.txt"].coordinates == [
-        [4.0, 5.0, 6.0],
-        [8.0, 9.0, 10.0],
-    ]
+    assert result.parsed_outputs["phi_nodes.txt"].coordinates == [[4.0, 5.0, 6.0], [8.0, 9.0, 10.0]]
     assert result.parsed_outputs["phi_nodes.txt"].potentials == [7.0, 11.0]
     assert "other.txt" not in result.parsed_outputs

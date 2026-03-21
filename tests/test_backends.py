@@ -79,10 +79,7 @@ def test_apptainer_remote_image_download_with_progress(tmp_path, monkeypatch):
     monkeypatch.setattr(container_backend.sys, "stderr", fake_stderr)
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    backend = ContainerBackend(
-        runtime="apptainer",
-        image="https://example.org/NextGenPB.sif",
-    )
+    backend = ContainerBackend(runtime="apptainer", image="https://example.org/NextGenPB.sif")
     backend.run(inputs=inputs, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
 
     local_image = tmp_path / "cache" / "NextGenPB.sif"
@@ -106,9 +103,7 @@ def test_apptainer_exec_args_are_inserted_after_exec(tmp_path, monkeypatch):
     monkeypatch.setattr("subprocess.run", fake_run)
 
     backend = ContainerBackend(
-        runtime="apptainer",
-        image="/tmp/NextGenPB.sif",
-        exec_args=["--nv", "--containall"],
+        runtime="apptainer", image="/tmp/NextGenPB.sif", exec_args=["--nv", "--containall"]
     )
     backend.run(inputs=inputs, workdir=tmp_path, nproc=2, ngpb_binary="ngpb")
 
@@ -122,6 +117,54 @@ def test_apptainer_exec_args_are_inserted_after_exec(tmp_path, monkeypatch):
         "--bind",
         f"{tmp_path}:{tmp_path}",
     ]
+
+
+def test_apptainer_uses_custom_absolute_path_when_not_on_path(tmp_path, monkeypatch):
+    inputs = NgpbInputs(prmfile=tmp_path / "ngpb.prm")
+    inputs.prmfile.write_text("solver.max_iterations = 1\n")
+
+    custom_apptainer = tmp_path / "bin" / "apptainer"
+    custom_apptainer.parent.mkdir()
+    custom_apptainer.write_text("#!/bin/sh\n")
+    custom_apptainer.chmod(custom_apptainer.stat().st_mode | 0o111)
+
+    captured = {}
+
+    def fake_run(command, cwd, stdout, stderr, check):
+        captured["command"] = command
+        return subprocess.CompletedProcess(command, 0)
+
+    def fake_which(name):
+        return None
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr("shutil.which", fake_which)
+
+    backend = ContainerBackend(
+        runtime=None, apptainer_path=str(custom_apptainer), image="/tmp/NextGenPB.sif"
+    )
+    backend.run(inputs=inputs, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
+
+    assert captured["command"][0] == str(custom_apptainer)
+    assert captured["command"][1] == "exec"
+
+
+def test_apptainer_custom_path_must_be_absolute(tmp_path):
+    backend = ContainerBackend(
+        runtime="apptainer", apptainer_path="apptainer", image="/tmp/NextGenPB.sif"
+    )
+
+    try:
+        backend.run(
+            inputs=NgpbInputs(prmfile=tmp_path / "ngpb.prm"),
+            workdir=tmp_path,
+            nproc=1,
+            ngpb_binary="ngpb",
+        )
+    except RuntimeError as exc:
+        assert "absolute path" in str(exc)
+    else:
+        raise AssertionError("ContainerBackend should reject non-absolute Apptainer paths")
 
 
 def test_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
@@ -157,9 +200,7 @@ def test_streaming_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
     monkeypatch.setattr("subprocess.Popen", lambda *args, **kwargs: FakeProcess())
 
     backend = ContainerBackend(
-        runtime="docker",
-        image="conceptlab/nextgenpb:latest",
-        stream_output=True,
+        runtime="docker", image="conceptlab/nextgenpb:latest", stream_output=True
     )
     try:
         backend.run(inputs=inputs, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
@@ -191,7 +232,11 @@ def test_apptainer_remote_image_download_is_locked(tmp_path, monkeypatch):
     results: list[str] = []
 
     def worker():
-        results.append(container_backend._prepare_container_image("apptainer", "https://example.org/NextGenPB.sif"))
+        results.append(
+            container_backend._prepare_container_image(
+                "apptainer", "https://example.org/NextGenPB.sif"
+            )
+        )
 
     thread = threading.Thread(target=worker)
     thread.start()
@@ -200,7 +245,11 @@ def test_apptainer_remote_image_download_is_locked(tmp_path, monkeypatch):
     second_result: list[str] = []
 
     def second_worker():
-        second_result.append(container_backend._prepare_container_image("apptainer", "https://example.org/NextGenPB.sif"))
+        second_result.append(
+            container_backend._prepare_container_image(
+                "apptainer", "https://example.org/NextGenPB.sif"
+            )
+        )
 
     second_thread = threading.Thread(target=second_worker)
     second_thread.start()

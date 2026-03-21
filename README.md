@@ -1,3 +1,5 @@
+[![PyPI](https://img.shields.io/pypi/v/ngpb4py.svg)](https://pypi.org/project/ngpb4py/) ![GPL-3.0](https://img.shields.io/github/license/pedrishi/ngpb4py)
+
 # ngpb4py
 
 `ngpb4py` is a thin Python wrapper for [NextGenPB](https://github.com/concept-lab/NextGenPB).
@@ -11,23 +13,20 @@
 
 ## Installation
 
-Install the package from the repository root:
+To install the latest stable version run:
 
-```bash
-uv pip install -e .
+```sh
+pip install ngpb4py
 ```
 
-If you prefer `pip`, the equivalent editable install is:
+> **Warning:** Apptainer must be installed on your system. See the [Apptainer installation guide](https://apptainer.org/docs/user/latest/quick_start.html) for setup instructions. 
 
-```bash
-pip install -e .
-```
+By default ngpb4py searches your system PATH for the Apptainer executable.
 
-For contributors who want to run the test suite, install the development
-dependencies as well:
+To specify a custom Apptainer path, pass `apptainer_path` to `NgpbRunner`:
 
-```bash
-uv sync --group dev
+```python
+runner = NgpbRunner(apptainer_path="/custom/path/to/apptainer")
 ```
 
 ## Quick Start
@@ -151,3 +150,42 @@ control wrapper logging:
 
 This affects the wrapper logs printed by `ngpb4py`. Parsed terminal output
 remains available afterwards through `result.log`.
+
+## Contributing
+
+Clone this repository and run the following from root of the repository:
+
+```sh
+# Create and install a virtual environment
+uv sync --python 3.10 --all-extras
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Install the pre-commit hooks
+pre-commit install --install-hooks
+```
+
+- This project follows the [Conventional Commits](https://www.conventionalcommits.org/) standard to automate [Semantic Versioning](https://semver.org/) and [Keep A Changelog](https://keepachangelog.com/) with [Commitizen](https://github.com/commitizen-tools/commitizen).
+- Run `poe` from within the development environment to print a list of [Poe the Poet](https://github.com/nat-n/poethepoet) tasks available to run on this project.
+- Run `uv add {package}` from within the development environment to install a run time dependency and add it to `pyproject.toml` and `uv.lock`. Add `--dev` to install a development dependency.
+- Run `uv sync --upgrade` from within the development environment to upgrade all dependencies to the latest versions allowed by `pyproject.toml`. Add `--only-dev` to upgrade the development dependencies only.
+- Run `cz bump` to bump the package's version, update the `CHANGELOG.md`, and create a git tag. Then push the changes and the git tag with `git push origin main --tags`.
+
+## License
+
+This repository and the published Python package `ngpb4py` are licensed under
+the [GNU GPL v3.0](LICENSE).
+
+`ngpb4py` is a separate Python wrapper project. It is not the `NextGenPB`
+solver itself, and its license statement applies to the wrapper code in this
+repository.
+
+`NextGenPB` is the upstream solver project maintained at
+<https://github.com/concept-lab/NextGenPB>. That project is distributed
+separately, includes its own copyright notices, and is also marked there as
+GPL-3.0 licensed. When you use `ngpb4py`, you should distinguish between:
+
+- `ngpb4py`: this Python wrapper package and repository
+- `NextGenPB`: the external solver, container image, documentation, and source
+  code provided by the upstream project

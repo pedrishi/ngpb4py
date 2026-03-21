@@ -5,7 +5,6 @@ import shutil
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 from .backends.base import ExecutionResult, NgpbBackend
 from .backends.container import ContainerBackend
@@ -20,13 +19,13 @@ class NgpbRunner:
     nproc: int = 1
     ngpb_binary: str = "ngpb"
     container_image: str = (
-        "https://github.com/concept-lab/NextGenPB/releases/download/"
-        "NextGenPB_v1.0.0/NextGenPB.sif"
+        "https://github.com/concept-lab/NextGenPB/releases/download/NextGenPB_v1.0.0/NextGenPB.sif"
     )
-    container_runtime: Optional[str] = "apptainer"
-    container_extra_args: Optional[List[str]] = None
-    container_exec_args: Optional[List[str]] = None
-    backend: Optional[NgpbBackend] = None
+    container_runtime: str | None = "apptainer"
+    apptainer_path: str | None = None
+    container_extra_args: list[str] | None = None
+    container_exec_args: list[str] | None = None
+    backend: NgpbBackend | None = None
     verbosity: int = 1
 
     def _make_backend(self) -> NgpbBackend:
@@ -41,6 +40,7 @@ class NgpbRunner:
         return ContainerBackend(
             image=self.container_image,
             runtime=self.container_runtime,
+            apptainer_path=self.apptainer_path,
             extra_args=self.container_extra_args,
             exec_args=self.container_exec_args,
         )
@@ -48,11 +48,11 @@ class NgpbRunner:
     def run(
         self,
         config: NgpbConfig,
-        pqr: Optional[str],
+        pqr: str | None,
         workdir: str,
-        inputs: Optional[NgpbInputs] = None,
+        inputs: NgpbInputs | None = None,
         collect_version: bool = True,
-        verbose: Optional[int] = None,
+        verbose: int | None = None,
         keep_files: bool = False,
     ) -> NgpbResult:
         effective_verbose = self.verbosity if verbose is None else verbose
@@ -68,12 +68,7 @@ class NgpbRunner:
             _LOGGER.info("Generating run inputs in %s", run_workdir)
         else:
             _LOGGER.info("Staging provided inputs into %s", run_workdir)
-        staged_inputs = _stage_inputs(
-            config=config,
-            pqr=pqr,
-            inputs=inputs,
-            workdir=run_workdir,
-        )
+        staged_inputs = _stage_inputs(config=config, pqr=pqr, inputs=inputs, workdir=run_workdir)
 
         if staged_inputs.pqrfile is None:
             _LOGGER.warning("No PQR file provided; proceeding without --pqrfile")
@@ -82,8 +77,8 @@ class NgpbRunner:
         _LOGGER.debug("Input paths: %s", ", ".join(input_paths))
 
         backend = self._make_backend()
-        if hasattr(backend, "stream_output"):
-            setattr(backend, "stream_output", effective_verbose >= 3)
+        if isinstance(backend, ContainerBackend):
+            backend.stream_output = effective_verbose >= 3
         _LOGGER.info("Running backend %s with %d process(es)", backend.name, self.nproc)
         cleanup_workdir = not keep_files
         try:
@@ -145,10 +140,7 @@ def _create_run_workdir(scratch_dir: Path) -> tuple[str, Path]:
 
 
 def _stage_inputs(
-    config: NgpbConfig,
-    pqr: Optional[str],
-    inputs: Optional[NgpbInputs],
-    workdir: Path,
+    config: NgpbConfig, pqr: str | None, inputs: NgpbInputs | None, workdir: Path
 ) -> NgpbInputs:
     if inputs is None:
         prm_path = workdir / "ngpb.prm"
@@ -156,10 +148,7 @@ def _stage_inputs(
         pqr_path = _copy_input_file(Path(pqr), workdir) if pqr else None
         return NgpbInputs(prmfile=prm_path, pqrfile=pqr_path)
 
-    copied_paths = {
-        source: _copy_input_file(source, workdir)
-        for source in inputs.iter_paths()
-    }
+    copied_paths = {source: _copy_input_file(source, workdir) for source in inputs.iter_paths()}
     return NgpbInputs(
         prmfile=copied_paths[inputs.prmfile],
         pqrfile=copied_paths[inputs.pqrfile] if inputs.pqrfile else None,
@@ -185,12 +174,7 @@ def _copy_input_file(path: Path, workdir: Path) -> Path:
 _LOGGER = logging.getLogger("ngpb4py")
 
 
-_VERBOSITY_LEVELS = {
-    0: logging.WARNING,
-    1: logging.INFO,
-    2: logging.DEBUG,
-    3: logging.DEBUG,
-}
+_VERBOSITY_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG, 3: logging.DEBUG}
 
 
 def _configure_logging(verbosity: int) -> None:

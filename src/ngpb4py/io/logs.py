@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import re
-from typing import Dict, List, Optional, Tuple
-
+from dataclasses import dataclass, field
 
 _FLOAT_RE = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
 _HEADER_RE = re.compile(r"=+\s*\[\s*(.*?)\s*\]\s*=+")
 _SELECTED_FILE_RE = re.compile(r"Selected\s+(.+?)\s*:\s*(.+)")
-_VECTOR_RE = re.compile(r"\[\s*(" + _FLOAT_RE + r")\s*,\s*(" + _FLOAT_RE + r")\s*,\s*(" + _FLOAT_RE + r")\s*\]")
+_VECTOR_RE = re.compile(
+    r"\[\s*(" + _FLOAT_RE + r")\s*,\s*(" + _FLOAT_RE + r")\s*,\s*(" + _FLOAT_RE + r")\s*\]"
+)
 _RANGE_RE = re.compile(r"=\s*\[\s*(" + _FLOAT_RE + r")\s*,\s*(" + _FLOAT_RE + r")\s*\]")
 _NX_NY_NZ_RE = re.compile(r"nx\s*=\s*(\d+)\s+ny\s*=\s*(\d+)\s+nz\s*=\s*(\d+)", re.IGNORECASE)
 _ITERATION_RE = re.compile(r"iteration:\s*(\d+)", re.IGNORECASE)
@@ -39,73 +39,73 @@ class GridSubdivisions:
 
 @dataclass
 class SystemInfo:
-    parameters_file: Optional[str] = None
-    pqr_file: Optional[str] = None
-    number_of_atoms: Optional[int] = None
-    protein_size_angstrom: Optional[Tuple[float, float, float]] = None
-    solute_dielectric_constant: Optional[float] = None
-    solvent_dielectric_constant: Optional[float] = None
-    temperature_kelvin: Optional[float] = None
-    ionic_strength_mol_per_l: Optional[float] = None
+    parameters_file: str | None = None
+    pqr_file: str | None = None
+    number_of_atoms: int | None = None
+    protein_size_angstrom: tuple[float, float, float] | None = None
+    solute_dielectric_constant: float | None = None
+    solvent_dielectric_constant: float | None = None
+    temperature_kelvin: float | None = None
+    ionic_strength_mol_per_l: float | None = None
 
 
 @dataclass
 class DomainInfo:
-    scale: Optional[float] = None
-    center_of_system_angstrom: Optional[Tuple[float, float, float]] = None
-    perfil_outer_box: Optional[float] = None
-    complete_domain_box: Optional[BoxBounds] = None
-    perfil_uniform_grid: Optional[float] = None
-    uniform_grid_box: Optional[BoxBounds] = None
-    uniform_grid_subdivisions: Optional[GridSubdivisions] = None
+    scale: float | None = None
+    center_of_system_angstrom: tuple[float, float, float] | None = None
+    perfil_outer_box: float | None = None
+    complete_domain_box: BoxBounds | None = None
+    perfil_uniform_grid: float | None = None
+    uniform_grid_box: BoxBounds | None = None
+    uniform_grid_subdivisions: GridSubdivisions | None = None
 
 
 @dataclass
 class SurfaceBuildInfo:
-    cavity_detection_time_s: Optional[float] = None
-    completed: Optional[bool] = None
+    cavity_detection_time_s: float | None = None
+    completed: bool | None = None
 
 
 @dataclass
 class GridBuildInfo:
-    total_nodes: Optional[int] = None
-    total_quadrants: Optional[int] = None
-    rank_count: Optional[int] = None
+    total_nodes: int | None = None
+    total_quadrants: int | None = None
+    rank_count: int | None = None
 
 
 @dataclass
 class SolverInfo:
-    boundary_conditions: Optional[str] = None
-    rho_calculation_time_ms: Optional[float] = None
-    initial_vector: Optional[str] = None
-    precision: Optional[str] = None
-    linear_solver: Optional[str] = None
-    preconditioner: Optional[str] = None
-    convergence_condition: Optional[str] = None
-    final_status: Optional[str] = None
-    iteration_count: Optional[int] = None
+    boundary_conditions: str | None = None
+    rho_calculation_time_ms: float | None = None
+    initial_vector: str | None = None
+    precision: str | None = None
+    linear_solver: str | None = None
+    preconditioner: str | None = None
+    convergence_condition: str | None = None
+    final_status: str | None = None
+    iteration_count: int | None = None
 
 
 @dataclass
 class ElectrostaticEnergy:
-    net_charge_e: Optional[float] = None
-    flux_charge_e: Optional[float] = None
-    polarization_energy_kt: Optional[float] = None
-    direct_ionic_energy_kt: Optional[float] = None
-    coulombic_energy_kt: Optional[float] = None
-    total_electrostatic_energy_kt: Optional[float] = None
+    net_charge_e: float | None = None
+    flux_charge_e: float | None = None
+    polarization_energy_kt: float | None = None
+    direct_ionic_energy_kt: float | None = None
+    coulombic_energy_kt: float | None = None
+    total_electrostatic_energy_kt: float | None = None
 
 
 @dataclass
 class ParsedLog:
-    system: Optional[SystemInfo] = None
-    domain: Optional[DomainInfo] = None
-    surface: Optional[SurfaceBuildInfo] = None
-    grid: Optional[GridBuildInfo] = None
-    solver: Optional[SolverInfo] = None
-    energies: Optional[ElectrostaticEnergy] = None
-    preamble_text: Optional[str] = None
-    section_text: Dict[str, str] = field(default_factory=dict)
+    system: SystemInfo | None = None
+    domain: DomainInfo | None = None
+    surface: SurfaceBuildInfo | None = None
+    grid: GridBuildInfo | None = None
+    solver: SolverInfo | None = None
+    energies: ElectrostaticEnergy | None = None
+    preamble_text: str | None = None
+    section_text: dict[str, str] = field(default_factory=dict)
 
     def section_count(self) -> int:
         return sum(
@@ -120,8 +120,8 @@ class ParsedLog:
             )
         )
 
-    def to_metrics(self) -> Dict[str, float]:
-        metrics: Dict[str, float] = {}
+    def to_metrics(self) -> dict[str, float]:
+        metrics: dict[str, float] = {}
         if self.grid is not None:
             if self.grid.total_quadrants is not None:
                 metrics["mesh.elements"] = float(self.grid.total_quadrants)
@@ -172,14 +172,14 @@ def parse_log(text: str) -> ParsedLog:
     return parsed
 
 
-def parse_log_metrics(text: str) -> Dict[str, float]:
+def parse_log_metrics(text: str) -> dict[str, float]:
     return parse_log(text).to_metrics()
 
 
-def _split_sections(text: str) -> Tuple[List[str], Dict[str, List[str]]]:
-    preamble: List[str] = []
-    sections: Dict[str, List[str]] = {}
-    current_name: Optional[str] = None
+def _split_sections(text: str) -> tuple[list[str], dict[str, list[str]]]:
+    preamble: list[str] = []
+    sections: dict[str, list[str]] = {}
+    current_name: str | None = None
 
     for raw_line in text.splitlines():
         line = raw_line.rstrip("\n")
@@ -203,7 +203,7 @@ def _split_sections(text: str) -> Tuple[List[str], Dict[str, List[str]]]:
     return preamble, sections
 
 
-def _normalize_section_name(name: str) -> Optional[str]:
+def _normalize_section_name(name: str) -> str | None:
     normalized = re.sub(r"\s+", " ", name.strip().lower())
     mapping = {
         "system information": "system",
@@ -221,8 +221,8 @@ def _is_separator_line(line: str) -> bool:
     return bool(stripped) and set(stripped) <= {"="}
 
 
-def _parse_selected_files(lines: List[str]) -> Dict[str, str]:
-    selected: Dict[str, str] = {}
+def _parse_selected_files(lines: list[str]) -> dict[str, str]:
+    selected: dict[str, str] = {}
     for line in lines:
         match = _SELECTED_FILE_RE.search(line.strip())
         if not match:
@@ -236,12 +236,12 @@ def _parse_selected_files(lines: List[str]) -> Dict[str, str]:
     return selected
 
 
-def _parse_system_info(lines: List[str], selected_files: Dict[str, str]) -> SystemInfo:
+def _parse_system_info(lines: list[str], selected_files: dict[str, str]) -> SystemInfo:
     info = SystemInfo(
         parameters_file=selected_files.get("parameters_file"),
         pqr_file=selected_files.get("pqr_file"),
     )
-    dielectric_values: List[float] = []
+    dielectric_values: list[float] = []
 
     for raw_line in lines:
         line = raw_line.strip()
@@ -258,7 +258,11 @@ def _parse_system_info(lines: List[str], selected_files: Dict[str, str]) -> Syst
                 lower = line.lower()
                 if "molecular" in lower or "solute" in lower or "protein" in lower:
                     info.solute_dielectric_constant = value
-                elif "solvent" in lower and info.solvent_dielectric_constant is None and len(dielectric_values) > 1:
+                elif (
+                    "solvent" in lower
+                    and info.solvent_dielectric_constant is None
+                    and len(dielectric_values) > 1
+                ):
                     info.solvent_dielectric_constant = value
         elif line.startswith("Temperature"):
             info.temperature_kelvin = _parse_float_field(line)
@@ -273,7 +277,7 @@ def _parse_system_info(lines: List[str], selected_files: Dict[str, str]) -> Syst
     return info
 
 
-def _parse_domain_info(lines: List[str]) -> DomainInfo:
+def _parse_domain_info(lines: list[str]) -> DomainInfo:
     info = DomainInfo()
     index = 0
     while index < len(lines):
@@ -301,9 +305,9 @@ def _parse_domain_info(lines: List[str]) -> DomainInfo:
     return info
 
 
-def _parse_surface_info(lines: List[str]) -> SurfaceBuildInfo:
-    cavity_detection_time_s: Optional[float] = None
-    completed: Optional[bool] = None
+def _parse_surface_info(lines: list[str]) -> SurfaceBuildInfo:
+    cavity_detection_time_s: float | None = None
+    completed: bool | None = None
 
     for raw_line in lines:
         line = raw_line.strip()
@@ -312,15 +316,12 @@ def _parse_surface_info(lines: List[str]) -> SurfaceBuildInfo:
         if _STATUS_OK_RE.search(line) or "Unpacking rays packet" in line:
             completed = True
 
-    return SurfaceBuildInfo(
-        cavity_detection_time_s=cavity_detection_time_s,
-        completed=completed,
-    )
+    return SurfaceBuildInfo(cavity_detection_time_s=cavity_detection_time_s, completed=completed)
 
 
-def _parse_grid_info(lines: List[str]) -> GridBuildInfo:
-    total_nodes: Optional[int] = None
-    total_quadrants: Optional[int] = None
+def _parse_grid_info(lines: list[str]) -> GridBuildInfo:
+    total_nodes: int | None = None
+    total_quadrants: int | None = None
     ranks = set()
 
     for raw_line in lines:
@@ -340,7 +341,7 @@ def _parse_grid_info(lines: List[str]) -> GridBuildInfo:
     )
 
 
-def _parse_solver_info(lines: List[str]) -> SolverInfo:
+def _parse_solver_info(lines: list[str]) -> SolverInfo:
     info = SolverInfo()
 
     for raw_line in lines:
@@ -371,7 +372,7 @@ def _parse_solver_info(lines: List[str]) -> SolverInfo:
     return info
 
 
-def _parse_energy_info(lines: List[str]) -> ElectrostaticEnergy:
+def _parse_energy_info(lines: list[str]) -> ElectrostaticEnergy:
     info = ElectrostaticEnergy()
 
     for raw_line in lines:
@@ -392,17 +393,17 @@ def _parse_energy_info(lines: List[str]) -> ElectrostaticEnergy:
     return info
 
 
-def _parse_vector(line: str) -> Optional[Tuple[float, float, float]]:
+def _parse_vector(line: str) -> tuple[float, float, float] | None:
     match = _VECTOR_RE.search(line)
     if not match:
         return None
     return (float(match.group(1)), float(match.group(2)), float(match.group(3)))
 
 
-def _parse_box(lines: List[str]) -> Optional[BoxBounds]:
+def _parse_box(lines: list[str]) -> BoxBounds | None:
     if len(lines) < 3:
         return None
-    axes: Dict[str, AxisBounds] = {}
+    axes: dict[str, AxisBounds] = {}
     for raw_line in lines[:3]:
         line = raw_line.strip()
         if not line:
@@ -417,31 +418,31 @@ def _parse_box(lines: List[str]) -> Optional[BoxBounds]:
     return BoxBounds(x=axes["x"], y=axes["y"], z=axes["z"])
 
 
-def _parse_subdivisions(line: str) -> Optional[GridSubdivisions]:
+def _parse_subdivisions(line: str) -> GridSubdivisions | None:
     match = _NX_NY_NZ_RE.search(line)
     if not match:
         return None
     return GridSubdivisions(nx=int(match.group(1)), ny=int(match.group(2)), nz=int(match.group(3)))
 
 
-def _parse_int_field(line: str) -> Optional[int]:
+def _parse_int_field(line: str) -> int | None:
     value = _parse_float_field(line)
     return int(value) if value is not None else None
 
 
-def _parse_float_field(line: str) -> Optional[float]:
+def _parse_float_field(line: str) -> float | None:
     match = _FIELD_NUMBER_RE.search(line)
     if not match:
         return None
     return float(match.group(1))
 
 
-def _parse_float_from_text(line: str) -> Optional[float]:
+def _parse_float_from_text(line: str) -> float | None:
     match = re.search(_FLOAT_RE, line)
     return float(match.group(0)) if match else None
 
 
-def _parse_text_field(line: str) -> Optional[str]:
+def _parse_text_field(line: str) -> str | None:
     if ":" not in line:
         return None
     value = line.split(":", 1)[1].strip()

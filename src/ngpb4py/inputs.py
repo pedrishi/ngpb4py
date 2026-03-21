@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, List, Optional
 
 
 @dataclass
 class NgpbInputs:
     prmfile: Path
-    pqrfile: Optional[Path] = None
-    aux_files: List[Path] = field(default_factory=list)
+    pqrfile: Path | None = None
+    aux_files: list[Path] = field(default_factory=list)
 
-    def as_args(self) -> List[str]:
+    def as_args(self) -> list[str]:
         args = ["--prmfile", str(self.prmfile)]
         if self.pqrfile:
             args += ["--pqrfile", str(self.pqrfile)]

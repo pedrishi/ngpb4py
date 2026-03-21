@@ -1,23 +1,17 @@
 from __future__ import annotations
 
-import os
 import subprocess
-from typing import Dict, List, Optional
 
 
 def collect_provenance(
-    command: List[str],
+    command: list[str],
     nproc: int,
     backend_name: str,
-    container_digest: Optional[str],
+    container_digest: str | None,
     ngpb_binary: str,
     collect_version: bool = True,
-) -> Dict[str, str]:
-    provenance = {
-        "backend": backend_name,
-        "nproc": str(nproc),
-        "command": " ".join(command),
-    }
+) -> dict[str, str]:
+    provenance = {"backend": backend_name, "nproc": str(nproc), "command": " ".join(command)}
     if container_digest:
         provenance["container_digest"] = container_digest
     if collect_version:
@@ -28,7 +22,7 @@ def collect_provenance(
     return provenance
 
 
-def _detect_ngpb_version(ngpb_binary: str) -> Optional[str]:
+def _detect_ngpb_version(ngpb_binary: str) -> str | None:
     try:
         output = subprocess.check_output([ngpb_binary, "--version"], stderr=subprocess.STDOUT)
         return output.decode(errors="replace").strip().splitlines()[0]

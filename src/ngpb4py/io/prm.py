@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..config import PrmOption
 
 
-def render_prm(data: Mapping[str, Any], schema: Mapping[str, "PrmOption"]) -> str:
+def render_prm(data: Mapping[str, Any], schema: Mapping[str, PrmOption]) -> str:
     lines = []
     for key in sorted(data.keys()):
         value = data[key]
@@ -16,9 +17,9 @@ def render_prm(data: Mapping[str, Any], schema: Mapping[str, "PrmOption"]) -> st
     return "\n".join(lines) + "\n"
 
 
-def load_prm(path: str) -> Dict[str, Any]:
-    parsed: Dict[str, Any] = {}
-    with open(path, "r") as handle:
+def load_prm(path: str) -> dict[str, Any]:
+    parsed: dict[str, Any] = {}
+    with open(path) as handle:
         for raw in handle:
             line = raw.strip()
             if not line or line.startswith("#") or line.startswith(";"):
@@ -31,7 +32,7 @@ def load_prm(path: str) -> Dict[str, Any]:
 
 
 def _coerce_value(value: str) -> Any:
-    cleaned = value.split()[0]
+    cleaned = value.split(maxsplit=1)[0]
     for cast in (int, float):
         try:
             return cast(cleaned)
