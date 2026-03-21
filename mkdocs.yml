@@ -9,6 +9,10 @@ theme:
 
 nav:
   - Home: index.md
+  - Getting Started: getting-started.md
+  - Running Jobs: running-jobs.md
+  - Working With Results: results.md
+  - Architecture: architecture.md
   - Reference: reference.md
 
 watch:
