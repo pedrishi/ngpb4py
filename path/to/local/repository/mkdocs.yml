@@ -1,0 +1,27 @@
+site_name: ngpb4py
+site_description: Thin Python wrapper for NextGenPB
+site_url: https://pedrishi.github.io/ngpb4py
+repo_url: https://github.com/pedrishi/ngpb4py
+repo_name: pedrishi/ngpb4py
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+  - Reference: reference.md
+
+watch:
+  - src
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences

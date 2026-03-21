@@ -1,0 +1,67 @@
+Selected parameters file: options.pot
+Selected pqr file:        1CCM.pqr
+
+========== [ System Information ] ==========
+  Number of atoms    : 642
+  Size protein [A]   : [27.815, 34.156, 24.478]
+  Solvent epsilon    : 2
+  Solvent epsilon    : 80
+  Temperature        : 298.15 [K]
+  Ionic strength     : 0.145 [mol/L]
+============================================
+
+========== [ Domain Information ] ==========
+  Scale:  2
+  Center of the System [A]:  [1.1775, 0.068, 0.07]
+  Perfil outer box:  0.5
+  Complete Domain Box Size [A]:
+      x = [-62.8225, 65.1775]
+      y = [-63.932, 64.068]
+      z = [-63.93, 64.07]
+  Perfil uniform grid:  0.9
+  Uniform grid Size [A]:
+      x = [-17.3225, 19.6775]
+      y = [-21.932, 22.068]
+      z = [-16.43, 16.57]
+  Number of Subdivisions in the Uniform grid:  nx = 74  ny = 88  nz = 66
+============================================
+
+=== [ Building Surface with NanoShaper ] ===
+ <<INFO>> TBB - User selected num threads 1
+ <<INFO>> Starting grid new PB initialization
+ <<INFO>> Cavity detection time is 0 [s]
+ <<INFO>> Assembling octrees..ok!
+ <<INFO>> Unpacking rays packet 0 of size 67380
+============================================
+
+============ [ Building Grid ] =============
+  [Rank 0] Local nodes     : 121559
+  [Rank 0] Local quadrants : 123118
+  [Rank 1] Local nodes     : 121559
+  [Rank 1] Local quadrants : 123118
+  [Global] Total nodes     : 473299
+  [Global] Total quadrants : 492472
+============================================
+
+== [ Starting numerical solution using LIS ] ==
+Selected BCs          : Null
+Time to calculate rho : 12 ms
+initial vector x      : all components set to 0
+precision             : double
+linear solver         : CGS
+preconditioner        : SSOR
+convergence condition : ||b-Ax||_1 <= 0.0e+00*||b||_1 + 1.0e-06 = 1.0e-06
+iteration:     1  relative residual = 3.067417E+05
+iteration:     2  relative residual = 2.069423E+06
+iteration:     3  relative residual = 9.036003E+05
+linear solver status  : normal end
+============================================
+
+================ [ Electrostatic Energy ] =================
+  Net charge [e]:                                 7.771561172376096e-16
+  Flux charge [e]:                                1.864835543054415e-10
+  Polarization energy [kT]:                       -316.2410979131763
+  Direct ionic energy [kT]:                       -0.3089150450692983
+  Coulombic energy [kT]:                          -10097.24155852402
+  Sum of electrostatic energy contributions [kT]: -10413.79157148227
+===========================================================

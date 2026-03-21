@@ -1,0 +1,21 @@
+[input]
+filetype = pqr
+filename = 1CCM.pqr
+[../]
+
+[mesh]
+mesh_shape = 0
+perfil1 = 0.95
+perfil2 = 0.2
+scale = 2.0
+[../]
+
+[model]
+bc_type = 1
+molecular_dielectric_constant = 2
+solvent_dielectric_constant = 80
+ionic_strength = 0.145
+T = 298.15
+calc_energy = 2
+calc_coulombic = 1
+[../]

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ngpb4py"
+version = "0.1.0"
+description = "Thin Python wrapper for NextGenPB"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+  {name = "ngpb4py contributors"}
+]
+keywords = ["NextGenPB", "PB", "HPC"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+markers = [
+  "integration: container-backed tests"
+]
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.10.1",
+    "mypy>=1.19.1",
+    "pre-commit>=4.3.0",
+    "pytest>=7.0",
+    "ruff>=0.15.3",
+]
