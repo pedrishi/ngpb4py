@@ -3,13 +3,12 @@ import subprocess
 import threading
 import time
 
-from ngpb4py.backends.container import ContainerBackend
-from ngpb4py.inputs import NgpbInputs
+from ngpb4py.container import ContainerBackend
 
 
 def test_container_command_building(tmp_path, monkeypatch):
-    inputs = NgpbInputs(prmfile=tmp_path / "ngpb.prm")
-    inputs.prmfile.write_text("solver.max_iterations = 1\n")
+    prmfile = tmp_path / "ngpb.prm"
+    prmfile.write_text("solver.max_iterations = 1\n")
 
     captured = {}
 
@@ -22,11 +21,14 @@ def test_container_command_building(tmp_path, monkeypatch):
 
     monkeypatch.setattr("subprocess.run", fake_run)
     monkeypatch.setattr("subprocess.check_output", fake_check_output)
+    monkeypatch.setattr(
+        "shutil.which", lambda name: "/usr/bin/docker" if name == "docker" else None
+    )
 
     backend = ContainerBackend(runtime="docker", image="conceptlab/nextgenpb:latest")
-    backend.run(inputs=inputs, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
+    backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
 
-    assert captured["command"][0:7] == [
+    assert captured["command"][0:13] == [
         "docker",
         "run",
         "--rm",
@@ -34,14 +36,21 @@ def test_container_command_building(tmp_path, monkeypatch):
         "1",
         "--env",
         "NGPB_NPROC=1",
+        "-v",
+        f"{tmp_path}:/App",
+        "-w",
+        "/App",
+        "conceptlab/nextgenpb:latest",
+        "ngpb",
     ]
+    assert captured["command"][-2:] == ["--prmfile", str(prmfile)]
 
 
 def test_apptainer_remote_image_download_with_progress(tmp_path, monkeypatch):
-    from ngpb4py.backends import container as container_backend
+    from ngpb4py.helpers import download_image
 
-    inputs = NgpbInputs(prmfile=tmp_path / "ngpb.prm")
-    inputs.prmfile.write_text("solver.max_iterations = 1\n")
+    prmfile = tmp_path / "ngpb.prm"
+    prmfile.write_text("solver.max_iterations = 1\n")
 
     class FakeResponse:
         def __init__(self):
@@ -75,12 +84,18 @@ def test_apptainer_remote_image_download_with_progress(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setenv("NGPB_CONTAINER_CACHE_DIR", str(tmp_path / "cache"))
-    monkeypatch.setattr(container_backend, "urlopen", fake_urlopen)
-    monkeypatch.setattr(container_backend.sys, "stderr", fake_stderr)
+    monkeypatch.setattr(download_image, "urlopen", fake_urlopen)
+    monkeypatch.setattr(download_image.sys, "stderr", fake_stderr)
     monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "subprocess.check_output", lambda command, stderr=None: b"sha256:dummy local-image"
+    )
+    monkeypatch.setattr(
+        "shutil.which", lambda name: "/usr/bin/apptainer" if name == "apptainer" else None
+    )
 
     backend = ContainerBackend(runtime="apptainer", image="https://example.org/NextGenPB.sif")
-    backend.run(inputs=inputs, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
+    backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
 
     local_image = tmp_path / "cache" / "NextGenPB.sif"
     assert captured["url"] == "https://example.org/NextGenPB.sif"
@@ -91,8 +106,8 @@ def test_apptainer_remote_image_download_with_progress(tmp_path, monkeypatch):
 
 
 def test_apptainer_exec_args_are_inserted_after_exec(tmp_path, monkeypatch):
-    inputs = NgpbInputs(prmfile=tmp_path / "ngpb.prm")
-    inputs.prmfile.write_text("solver.max_iterations = 1\n")
+    prmfile = tmp_path / "ngpb.prm"
+    prmfile.write_text("solver.max_iterations = 1\n")
 
     captured = {}
 
@@ -101,27 +116,37 @@ def test_apptainer_exec_args_are_inserted_after_exec(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "subprocess.check_output", lambda command, stderr=None: b"sha256:dummy local-image"
+    )
+    monkeypatch.setattr(
+        "shutil.which", lambda name: "/usr/bin/apptainer" if name == "apptainer" else None
+    )
 
     backend = ContainerBackend(
         runtime="apptainer", image="/tmp/NextGenPB.sif", exec_args=["--nv", "--containall"]
     )
-    backend.run(inputs=inputs, workdir=tmp_path, nproc=2, ngpb_binary="ngpb")
+    backend.run(prm_f=prmfile, workdir=tmp_path, nproc=2, ngpb_binary="ngpb")
 
-    assert captured["command"][:8] == [
-        "apptainer",
+    assert captured["command"][0].endswith("apptainer")
+    assert captured["command"][1:12] == [
         "exec",
         "--nv",
         "--containall",
-        "--env",
-        "NGPB_NPROC=2",
+        "--pwd",
+        "/App",
         "--bind",
-        f"{tmp_path}:{tmp_path}",
+        f"{tmp_path}:/App",
+        "/tmp/NextGenPB.sif",
+        "mpirun",
+        "-np",
+        "2",
     ]
 
 
 def test_apptainer_uses_custom_absolute_path_when_not_on_path(tmp_path, monkeypatch):
-    inputs = NgpbInputs(prmfile=tmp_path / "ngpb.prm")
-    inputs.prmfile.write_text("solver.max_iterations = 1\n")
+    prmfile = tmp_path / "ngpb.prm"
+    prmfile.write_text("solver.max_iterations = 1\n")
 
     custom_apptainer = tmp_path / "bin" / "apptainer"
     custom_apptainer.parent.mkdir()
@@ -143,24 +168,21 @@ def test_apptainer_uses_custom_absolute_path_when_not_on_path(tmp_path, monkeypa
     backend = ContainerBackend(
         runtime=None, apptainer_path=str(custom_apptainer), image="/tmp/NextGenPB.sif"
     )
-    backend.run(inputs=inputs, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
+    backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
 
     assert captured["command"][0] == str(custom_apptainer)
     assert captured["command"][1] == "exec"
 
 
 def test_apptainer_custom_path_must_be_absolute(tmp_path):
+    prmfile = tmp_path / "ngpb.prm"
+    prmfile.write_text("solver.max_iterations = 1\n")
     backend = ContainerBackend(
         runtime="apptainer", apptainer_path="apptainer", image="/tmp/NextGenPB.sif"
     )
 
     try:
-        backend.run(
-            inputs=NgpbInputs(prmfile=tmp_path / "ngpb.prm"),
-            workdir=tmp_path,
-            nproc=1,
-            ngpb_binary="ngpb",
-        )
+        backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
     except RuntimeError as exc:
         assert "absolute path" in str(exc)
     else:
@@ -168,17 +190,20 @@ def test_apptainer_custom_path_must_be_absolute(tmp_path):
 
 
 def test_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
-    inputs = NgpbInputs(prmfile=tmp_path / "ngpb.prm")
-    inputs.prmfile.write_text("solver.max_iterations = 1\n")
+    prmfile = tmp_path / "ngpb.prm"
+    prmfile.write_text("solver.max_iterations = 1\n")
 
     def fake_run(command, cwd, stdout, stderr, check):
         return subprocess.CompletedProcess(command, 7)
 
     monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "shutil.which", lambda name: "/usr/bin/docker" if name == "docker" else None
+    )
 
     backend = ContainerBackend(runtime="docker", image="conceptlab/nextgenpb:latest")
     try:
-        backend.run(inputs=inputs, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
+        backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
     except subprocess.CalledProcessError as exc:
         assert exc.returncode == 7
     else:
@@ -186,8 +211,8 @@ def test_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
 
 
 def test_streaming_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
-    inputs = NgpbInputs(prmfile=tmp_path / "ngpb.prm")
-    inputs.prmfile.write_text("solver.max_iterations = 1\n")
+    prmfile = tmp_path / "ngpb.prm"
+    prmfile.write_text("solver.max_iterations = 1\n")
 
     class FakeProcess:
         def __init__(self):
@@ -198,12 +223,15 @@ def test_streaming_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
             return 9
 
     monkeypatch.setattr("subprocess.Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(
+        "shutil.which", lambda name: "/usr/bin/docker" if name == "docker" else None
+    )
 
     backend = ContainerBackend(
         runtime="docker", image="conceptlab/nextgenpb:latest", stream_output=True
     )
     try:
-        backend.run(inputs=inputs, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
+        backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
     except subprocess.CalledProcessError as exc:
         assert exc.returncode == 9
     else:
@@ -211,7 +239,8 @@ def test_streaming_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
 
 
 def test_apptainer_remote_image_download_is_locked(tmp_path, monkeypatch):
-    from ngpb4py.backends import container as container_backend
+    from ngpb4py import container as container_backend
+    from ngpb4py.helpers import download_image
 
     destination = tmp_path / "cache" / "NextGenPB.sif"
     destination.parent.mkdir()
@@ -227,13 +256,13 @@ def test_apptainer_remote_image_download_is_locked(tmp_path, monkeypatch):
         release.wait(timeout=2)
         dest.write_text("image")
 
-    monkeypatch.setattr(container_backend, "_download_with_progress", fake_download)
+    monkeypatch.setattr(download_image, "download_with_progress", fake_download)
 
     results: list[str] = []
 
     def worker():
         results.append(
-            container_backend._prepare_container_image(
+            container_backend.prepare_container_image(
                 "apptainer", "https://example.org/NextGenPB.sif"
             )
         )
@@ -246,7 +275,7 @@ def test_apptainer_remote_image_download_is_locked(tmp_path, monkeypatch):
 
     def second_worker():
         second_result.append(
-            container_backend._prepare_container_image(
+            container_backend.prepare_container_image(
                 "apptainer", "https://example.org/NextGenPB.sif"
             )
         )

@@ -3,60 +3,54 @@
 ## Building Configuration
 
 `NgpbConfig` stores parameter data as a mapping keyed by the exact `.prm`
-option names.
+option names used by NextGenPB. The built-in schema mirrors the documented
+parameters from the NextGenPB parameter-file guide, including explicit upstream
+defaults, basic validation for known option types, and the documented PRM block
+metadata for each known key such as `input`, `mesh`, `model`, `surface`, and
+`solver`.
 
 ```python
 from ngpb4py import NgpbConfig
 
 config = NgpbConfig.defaults().with_updates(
     {
-        "mesh.fineness": 3,
-        "solver.max_iterations": 300,
-        "output.prefix": "protein_a",
+        "filetype": "pdb",
+        "filename": "protein.pdb",
+        "radius_file": "radius.siz",
+        "charge_file": "charge.crg",
+        "write_pqr": 1,
+        "mesh_shape": 0,
+        "scale": 3.0,
+        "potential_map": 1,
     }
 )
 ```
 
-The built-in schema validates known options before rendering:
+The built-in schema validates known options before rendering while still
+preserving unknown keys loaded from existing `.prm` files:
 
 ```python
 config.validate()
 prm_text = config.to_prm()
 ```
 
-You can also load an existing parameter file:
+## Running An Existing `.prm`
+
+When you already have a prepared `.prm` file, load it into `NgpbConfig` and
+run it directly. Runtime inputs referenced by keys such as `filename`,
+`radius_file`, and `charge_file` are resolved relative to the `.prm` file:
 
 ```python
-config = NgpbConfig.from_prm("options.prm")
-```
-
-## Passing Explicit Inputs
-
-When you already have a prepared `.prm` file and additional auxiliary inputs,
-build an `NgpbInputs` object and pass it through `run()`:
-
-```python
-from pathlib import Path
-
-from ngpb4py import NgpbConfig, NgpbInputs, NgpbRunner
+from ngpb4py import NgpbConfig, NgpbRunner
 
 runner = NgpbRunner()
-inputs = NgpbInputs(
-    prmfile=Path("options.prm"),
-    pqrfile=Path("molecule.pqr"),
-    aux_files=[Path("radius.siz"), Path("charge.crg")],
-)
+config = NgpbConfig.from_prm("options.prm")
 
-result = runner.run(
-    config=NgpbConfig.defaults(),
-    pqr=None,
-    inputs=inputs,
-    workdir="/tmp/ngpb-runs",
-)
+result = runner.run(config=config, workdir="/tmp/ngpb-runs")
 ```
 
-When `inputs` is provided, `NgpbRunner` stages those files into the run
-directory instead of generating `ngpb.prm` from `config`.
+When a loaded `.prm` references input files that do not exist alongside the
+source file, `run()` fails before launching the backend.
 
 ## Work Directory Semantics
 
@@ -87,8 +81,8 @@ parsed NextGenPB log is still available later via `result.log`.
 
 ## Runtime Configuration
 
-The default backend is the built-in container backend. Common customization
-points are:
+`ngpb4py` always runs NextGenPB through the built-in container backend. Common
+customization points are:
 
 ```python
 runner = NgpbRunner(
@@ -102,7 +96,9 @@ runner = NgpbRunner(
 
 - `container_exec_args` are inserted into the runtime's `exec` invocation
 - `container_extra_args` are injected earlier in the full runtime command
-- `backend` lets you bypass container execution entirely with a custom backend
+- `container_runtime` can be set to `docker`, `apptainer`, or `singularity`
+- `container_image` can be a Docker image reference, a local `.sif`, or a
+  remote `.sif` URL
 
 ## Operational Guidance
 

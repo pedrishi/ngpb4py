@@ -6,8 +6,6 @@
 
 ::: ngpb4py.config
 
-::: ngpb4py.inputs
-
 ::: ngpb4py.runner
 
 ::: ngpb4py.result

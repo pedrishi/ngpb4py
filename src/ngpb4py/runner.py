@@ -6,12 +6,12 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from .backends.base import ExecutionResult, NgpbBackend
-from .backends.container import ContainerBackend
 from .config import NgpbConfig
-from .inputs import NgpbInputs
-from .provenance import collect_provenance
+from .container import ContainerBackend
 from .result import NgpbResult
+from .verbose import _configure_logging
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -25,32 +25,12 @@ class NgpbRunner:
     apptainer_path: str | None = None
     container_extra_args: list[str] | None = None
     container_exec_args: list[str] | None = None
-    backend: NgpbBackend | None = None
     verbosity: int = 1
-
-    def _make_backend(self) -> NgpbBackend:
-        if self.backend is not None:
-            _LOGGER.debug("Using preconfigured backend: %s", self.backend)
-            return self.backend
-        _LOGGER.debug(
-            "Creating container backend with image=%s runtime=%s",
-            self.container_image,
-            self.container_runtime,
-        )
-        return ContainerBackend(
-            image=self.container_image,
-            runtime=self.container_runtime,
-            apptainer_path=self.apptainer_path,
-            extra_args=self.container_extra_args,
-            exec_args=self.container_exec_args,
-        )
 
     def run(
         self,
         config: NgpbConfig,
-        pqr: str | None,
         workdir: str,
-        inputs: NgpbInputs | None = None,
         collect_version: bool = True,
         verbose: int | None = None,
         keep_files: bool = False,
@@ -64,40 +44,50 @@ class NgpbRunner:
         run_id, run_workdir = _create_run_workdir(scratch_dir)
         _LOGGER.debug("Using scratch_dir=%s run_id=%s workdir=%s", scratch_dir, run_id, run_workdir)
 
-        if inputs is None:
-            _LOGGER.info("Generating run inputs in %s", run_workdir)
-        else:
-            _LOGGER.info("Staging provided inputs into %s", run_workdir)
-        staged_inputs = _stage_inputs(config=config, pqr=pqr, inputs=inputs, workdir=run_workdir)
+        _LOGGER.info("Staging run inputs into %s", run_workdir)
+        prm_path, staged_paths = _stage_inputs(config=config, workdir=run_workdir)
 
-        if staged_inputs.pqrfile is None:
+        if config.data.get("filetype") == "pqr" and "filename" not in staged_paths:
             _LOGGER.warning("No PQR file provided; proceeding without --pqrfile")
 
-        input_paths = [str(path) for path in staged_inputs.iter_paths()]
+        input_paths = [str(prm_path), *(str(path) for path in staged_paths.values())]
         _LOGGER.debug("Input paths: %s", ", ".join(input_paths))
 
-        backend = self._make_backend()
-        if isinstance(backend, ContainerBackend):
-            backend.stream_output = effective_verbose >= 3
+        _LOGGER.debug(
+            "Creating container backend with image=%s runtime=%s",
+            self.container_image,
+            self.container_runtime,
+        )
+        backend = ContainerBackend(
+            image=self.container_image,
+            runtime=self.container_runtime,
+            apptainer_path=self.apptainer_path,
+            extra_args=self.container_extra_args,
+            exec_args=self.container_exec_args,
+        )
+
+        backend.stream_output = effective_verbose >= 3
         _LOGGER.info("Running backend %s with %d process(es)", backend.name, self.nproc)
         cleanup_workdir = not keep_files
         try:
-            exec_result: ExecutionResult = backend.run(
-                inputs=staged_inputs,
+            exec_result = backend.run(
+                prm_f=prm_path,
                 workdir=run_workdir,
                 nproc=self.nproc,
                 ngpb_binary=self.ngpb_binary,
+                collect_version=collect_version,
             )
             _LOGGER.info("Backend execution completed")
 
-            provenance = collect_provenance(
-                command=exec_result.command,
-                nproc=self.nproc,
-                backend_name=backend.name,
-                container_digest=exec_result.container_digest,
-                ngpb_binary=self.ngpb_binary,
-                collect_version=collect_version,
-            )
+            provenance = dict(exec_result.provenance)
+            if not provenance:
+                provenance = {
+                    "backend": backend.name,
+                    "nproc": str(self.nproc),
+                    "command": " ".join(exec_result.command),
+                }
+                if exec_result.container_digest:
+                    provenance["container_digest"] = exec_result.container_digest
             provenance["run_id"] = run_id
             _LOGGER.debug("Collected provenance entries: %d", len(provenance))
 
@@ -139,21 +129,25 @@ def _create_run_workdir(scratch_dir: Path) -> tuple[str, Path]:
             continue
 
 
-def _stage_inputs(
-    config: NgpbConfig, pqr: str | None, inputs: NgpbInputs | None, workdir: Path
-) -> NgpbInputs:
-    if inputs is None:
-        prm_path = workdir / "ngpb.prm"
-        prm_path.write_text(config.to_prm())
-        pqr_path = _copy_input_file(Path(pqr), workdir) if pqr else None
-        return NgpbInputs(prmfile=prm_path, pqrfile=pqr_path)
+def _stage_inputs(config: NgpbConfig, workdir: Path) -> tuple[Path, dict[str, Path]]:
+    staged_data = dict(config.data)
+    staged_paths: dict[str, Path] = {}
 
-    copied_paths = {source: _copy_input_file(source, workdir) for source in inputs.iter_paths()}
-    return NgpbInputs(
-        prmfile=copied_paths[inputs.prmfile],
-        pqrfile=copied_paths[inputs.pqrfile] if inputs.pqrfile else None,
-        aux_files=[copied_paths[path] for path in inputs.aux_files],
-    )
+    for key in config.iter_input_file_keys():
+        source_path = config.resolve_input_file(key)
+        if not source_path.exists():
+            raise FileNotFoundError(
+                f"Input file referenced by '{key}' does not exist: {source_path}"
+            )
+        staged_path = _copy_input_file(source_path, workdir)
+        staged_paths[key] = staged_path
+        staged_data[key] = staged_path.name
+
+    staged_config = config.with_updates(staged_data)
+    prm_path = workdir / config.prm_filename()
+    prm_path.write_text(staged_config.to_prm())
+
+    return prm_path, staged_paths
 
 
 def _copy_input_file(path: Path, workdir: Path) -> Path:
@@ -169,23 +163,3 @@ def _copy_input_file(path: Path, workdir: Path) -> Path:
         )
     shutil.copy2(path, destination)
     return destination
-
-
-_LOGGER = logging.getLogger("ngpb4py")
-
-
-_VERBOSITY_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG, 3: logging.DEBUG}
-
-
-def _configure_logging(verbosity: int) -> None:
-    level = _VERBOSITY_LEVELS.get(verbosity, logging.DEBUG)
-    _LOGGER.setLevel(level)
-
-    if not _LOGGER.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
-        _LOGGER.addHandler(handler)
-        _LOGGER.propagate = False
-
-    for handler in _LOGGER.handlers:
-        handler.setLevel(level)

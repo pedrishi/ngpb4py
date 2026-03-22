@@ -23,4 +23,3 @@ T                             = 298.15 # Temperature in Kelvin
 calc_energy    = 2
 calc_coulombic = 1
 [../]
-

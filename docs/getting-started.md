@@ -26,20 +26,16 @@ uv sync --group dev
 
 ## First Run
 
-The simplest path is to generate a `.prm` file from the built-in defaults and
-provide a PQR file:
+The simplest path is to load an existing `.prm` file and let `NgpbConfig`
+stage the neighboring runtime inputs it references:
 
 ```python
 from ngpb4py import NgpbConfig, NgpbRunner
 
-config = NgpbConfig.defaults()
+config = NgpbConfig.from_prm("examples/exercise1/options.prm")
 runner = NgpbRunner(nproc=4)
 
-result = runner.run(
-    config=config,
-    pqr="molecule.pqr",
-    workdir="/tmp/ngpb-runs",
-)
+result = runner.run(config=config, workdir="/tmp/ngpb-runs")
 
 print(result.log.energies.total_electrostatic_energy_kt)
 ```
@@ -80,8 +76,11 @@ python examples/exercise1/exercise1.py
 
 - Use a parent scratch directory such as `/tmp/ngpb-runs` and let `run()` create
   per-run child directories
-- Start with `NgpbConfig.defaults()` and layer only the parameters you need to
+- Start with `NgpbConfig.defaults()` when you want the upstream
+  NextGenPB defaults as a base, then layer only the parameters you need to
   change
+- Use `NgpbConfig.from_prm("options.prm")` when you already have a prepared
+  parameter file and its referenced inputs
 - Set `keep_files=True` when you are validating new inputs or debugging runtime
   failures
 - Use `verbose=2` or `verbose=3` while integrating, then drop back to quieter

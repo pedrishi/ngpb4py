@@ -6,8 +6,8 @@
 
 ## Features
 
-- Typed configuration, input, runner, and result objects 
-- Pluggable execution backends with Apptainer as the default runtime
+- Typed configuration, runner, and result objects
+- Container-based execution with Apptainer as the default runtime
 - Structured parsing for documented log sections and potential output files
 - Per-run scratch directories with automatic cleanup on successful runs
 
@@ -19,7 +19,7 @@ To install the latest stable version run:
 pip install ngpb4py
 ```
 
-> **Warning:** Apptainer must be installed on your system. See the [Apptainer installation guide](https://apptainer.org/docs/user/latest/quick_start.html) for setup instructions. 
+> **Warning:** A supported container runtime must be installed on your system. See the [Apptainer installation guide](https://apptainer.org/docs/user/latest/quick_start.html) if you plan to use Apptainer or Singularity.
 
 By default ngpb4py searches your system PATH for the Apptainer executable.
 
@@ -34,10 +34,9 @@ runner = NgpbRunner(apptainer_path="/custom/path/to/apptainer")
 ```python
 from ngpb4py import NgpbConfig, NgpbRunner
 
-config = NgpbConfig.defaults()
+config = NgpbConfig.from_prm("examples/exercise1/options.prm")
 result = NgpbRunner(nproc=16).run(
-    config,
-    pqr="molecule.pqr",
+    config=config,
     workdir="/tmp/ngpb-scratch",
     verbose=3,
 )
@@ -86,12 +85,26 @@ uv run --group dev python -m pytest
 
 ## Runtime Backends
 
-By default, `NgpbRunner` uses Apptainer with the published SIF image:
+`ngpb4py` always runs NextGenPB in a container. By default, `NgpbRunner` uses
+Apptainer with the published SIF image:
 
 <https://github.com/concept-lab/NextGenPB/releases/download/NextGenPB_v1.0.0/NextGenPB.sif>
 
 If you prefer Docker, build or provide a Docker image and pass the image name to
 `NgpbRunner`.
+
+If you want to keep using Apptainer or Singularity with a different image, pass
+an alternate local or remote `.sif` via `container_image`:
+
+```python
+runner = NgpbRunner(
+    container_runtime="apptainer",
+    container_image="/data/images/NextGenPB-custom.sif",
+)
+```
+
+Remote `.sif` URLs are downloaded and cached automatically for
+Apptainer-compatible runtimes.
 
 To add flags directly to `apptainer exec`, pass `container_exec_args`:
 

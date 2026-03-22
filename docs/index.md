@@ -2,14 +2,13 @@
 
 `ngpb4py` is a thin Python wrapper around
 [NextGenPB](https://github.com/concept-lab/NextGenPB). It focuses on a small,
-typed API for preparing `.prm` inputs, running the solver
-through a container backend, and parsing the documented parts of the solver
+typed API for preparing `.prm` inputs with NextGenPB defaults,
+running the solver through a container backend, and parsing the solver
 log into structured Python objects.
 
 ## What It Provides
 
-- `NgpbConfig` for working with parameter data and rendering `.prm` files
-- `NgpbInputs` for staging explicit input files
+- `NgpbConfig` for working with parameter data, loading `.prm` files, and staging referenced inputs
 - `NgpbRunner` for creating an isolated run directory and launching NextGenPB
 - `NgpbResult` for structured log data, metrics, provenance, and parsed output
   files
@@ -22,18 +21,16 @@ from ngpb4py import NgpbConfig, NgpbRunner
 
 config = NgpbConfig.defaults().with_updates(
     {
-        "solver.max_iterations": 400,
-        "solver.tolerance": 1e-7,
+        "filetype": "pdb",
+        "filename": "protein.pdb",
+        "radius_file": "radius.siz",
+        "charge_file": "charge.crg",
+        "scale": 3.0,
     }
 )
 
 runner = NgpbRunner(nproc=8)
-result = runner.run(
-    config=config,
-    pqr="molecule.pqr",
-    workdir="/tmp/ngpb-runs",
-    keep_files=False,
-)
+result = runner.run(config=config, workdir="/tmp/ngpb-runs", keep_files=False)
 
 print(result.log.grid.total_nodes)
 print(result.metrics["energy.total"])
@@ -53,7 +50,7 @@ print(result.metrics["energy.total"])
 
 ## Design Principles
 
-- Keep the wrapper small and explicit rather than mirroring every solver detail
+- Mirror the documented NextGenPB parameter surface while keeping the Python API explicit
 - Prefer typed Python objects over ad hoc text parsing in user code
 - Treat each `run()` call as an isolated execution with its own work directory
 - Preserve failed runs for debugging and clean up successful runs by default

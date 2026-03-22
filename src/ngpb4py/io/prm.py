@@ -6,14 +6,36 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ..config import PrmOption
 
+_BLOCK_ORDER = ("input", "mesh", "model", "surface", "solver")
+
 
 def render_prm(data: Mapping[str, Any], schema: Mapping[str, PrmOption]) -> str:
     lines = []
-    for key in sorted(data.keys()):
+    rendered_keys: set[str] = set()
+
+    for block in _BLOCK_ORDER:
+        block_keys = [
+            key for key, option in schema.items() if option.block == block and key in data
+        ]
+        if not block_keys:
+            continue
+
+        if lines:
+            lines.append("")
+        lines.append(f"[{block}]")
+        for key in block_keys:
+            value = data[key]
+            lines.append(f"{key} = {value}")
+            rendered_keys.add(key)
+        lines.append("[../]")
+
+    unknown_keys = sorted(key for key in data if key not in rendered_keys)
+    if unknown_keys and lines:
+        lines.append("")
+    for key in unknown_keys:
         value = data[key]
-        option = schema.get(key)
-        unit = f" [{option.unit}]" if option and option.unit else ""
-        lines.append(f"{key} = {value}{unit}")
+        lines.append(f"{key} = {value}")
+
     return "\n".join(lines) + "\n"
 
 

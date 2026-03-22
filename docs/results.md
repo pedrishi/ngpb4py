@@ -6,7 +6,7 @@
 parsed solver output.
 
 ```python
-result = runner.run(config=config, pqr="molecule.pqr", workdir="/tmp/ngpb-runs")
+result = runner.run(config=config, workdir="/tmp/ngpb-runs")
 
 print(result.run_id)
 print(result.command)
