@@ -50,6 +50,12 @@ if phi_surf:
     print(phi_surf.potentials[:10])
 ```
 
+When `radius_file` and `charge_file` are omitted, `ngpb4py` stages packaged
+default databases named `radius.siz` and `charge.crg` automatically. If you set
+either path explicitly, that file is resolved from the current working
+directory, an absolute path, or relative to the source `.prm`, and missing
+explicit files still fail before the solver starts.
+
 ## Running Examples
 
 The repository includes runnable examples under `examples/` that mirror the

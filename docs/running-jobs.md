@@ -49,8 +49,11 @@ config = NgpbConfig.from_prm("options.prm")
 result = runner.run(config=config, workdir="/tmp/ngpb-runs")
 ```
 
-When a loaded `.prm` references input files that do not exist alongside the
-source file, `run()` fails before launching the backend.
+If `radius_file` or `charge_file` are omitted, `run()` stages packaged defaults
+named `radius.siz` and `charge.crg`. If those keys are explicitly provided,
+their paths are resolved from the current working directory, absolute path, or
+relative to the source `.prm` file. Missing explicit input files still fail
+before launching the backend.
 
 ## Work Directory Semantics
 

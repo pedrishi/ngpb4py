@@ -52,3 +52,6 @@ phi_*.txt
 # Docs and Reports
 site/
 reports/
+
+# Codex
+AGENTS.md

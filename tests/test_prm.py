@@ -4,6 +4,7 @@ import pytest
 from examples.exercise4.exercise4 import build_config
 
 from ngpb4py import NgpbConfig
+from ngpb4py.config import packaged_default_input
 from ngpb4py.io.prm import load_prm
 
 
@@ -166,6 +167,74 @@ def test_validate_accepts_int_literals_for_float_fields_loaded_from_prm(tmp_path
 
     config = NgpbConfig.from_prm(str(prm_path))
     config.validate()
+
+
+def test_from_prm_resolves_missing_relative_path_from_cwd(tmp_path, monkeypatch):
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    prm_path = project_dir / "options.prm"
+    prm_path.write_text("filename = molecule.pqr\n")
+
+    monkeypatch.chdir(tmp_path)
+
+    config = NgpbConfig.from_prm("project/options.prm")
+
+    assert config.source_prm_path == prm_path.resolve()
+    assert config.source_dir == project_dir.resolve()
+
+
+def test_resolve_input_file_prefers_existing_cwd_relative_path(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    input_path = run_dir / "molecule.pqr"
+    input_path.write_text("ATOM\n")
+
+    monkeypatch.chdir(run_dir)
+    config = NgpbConfig.defaults().with_updates({"filename": "molecule.pqr"})
+
+    assert config.resolve_input_file("filename") == input_path.resolve()
+
+
+def test_resolve_input_file_falls_back_to_source_prm_directory(tmp_path, monkeypatch):
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    input_path = project_dir / "radius.siz"
+    input_path.write_text("1.0\n")
+
+    monkeypatch.chdir(tmp_path)
+    config = NgpbConfig(data={"radius_file": "radius.siz"}, source_dir=project_dir.resolve())
+
+    assert config.resolve_input_file("radius_file") == input_path.resolve()
+
+
+def test_resolve_input_file_preserves_absolute_paths(tmp_path):
+    input_path = tmp_path / "charge.crg"
+    input_path.write_text("1 0.0\n")
+
+    config = NgpbConfig.defaults().with_updates({"charge_file": str(input_path.resolve())})
+
+    assert config.resolve_input_file("charge_file") == input_path.resolve()
+
+
+def test_defaults_use_packaged_auxiliary_databases():
+    config = NgpbConfig.defaults()
+
+    assert config.uses_packaged_default_input("radius_file") is True
+    assert config.uses_packaged_default_input("charge_file") is True
+
+
+def test_explicit_auxiliary_database_path_disables_packaged_default():
+    config = NgpbConfig.defaults().with_updates({"radius_file": "custom.siz"})
+
+    assert config.uses_packaged_default_input("radius_file") is False
+
+
+def test_packaged_default_input_exposes_packaged_resource():
+    resource = packaged_default_input("radius_file")
+
+    assert resource.name == "radius.siz"
+    assert resource.is_file()
+    assert "atom__res_radius_" in resource.read_text()
 
 
 def test_exercise1_prm_load():

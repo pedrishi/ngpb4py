@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import NgpbConfig
+from .config import NgpbConfig, packaged_default_input
 from .container import ContainerBackend
 from .result import NgpbResult
 from .verbose import _configure_logging
@@ -134,12 +134,17 @@ def _stage_inputs(config: NgpbConfig, workdir: Path) -> tuple[Path, dict[str, Pa
     staged_paths: dict[str, Path] = {}
 
     for key in config.iter_input_file_keys():
-        source_path = config.resolve_input_file(key)
-        if not source_path.exists():
-            raise FileNotFoundError(
-                f"Input file referenced by '{key}' does not exist: {source_path}"
-            )
-        staged_path = _copy_input_file(source_path, workdir)
+        if config.uses_packaged_default_input(key):
+            resource = packaged_default_input(key)
+            staged_path = _copy_packaged_input_file(resource, workdir)
+        else:
+            source_path = config.resolve_input_file(key)
+            if not source_path.exists():
+                raise FileNotFoundError(
+                    f"Input file referenced by '{key}' does not exist: {source_path}"
+                )
+            staged_path = _copy_input_file(source_path, workdir)
+
         staged_paths[key] = staged_path
         staged_data[key] = staged_path.name
 
@@ -162,4 +167,15 @@ def _copy_input_file(path: Path, workdir: Path) -> Path:
             "Rename one of the inputs before running."
         )
     shutil.copy2(path, destination)
+    return destination
+
+
+def _copy_packaged_input_file(resource, workdir: Path) -> Path:
+    destination = workdir / resource.name
+    if destination.exists():
+        raise ValueError(
+            f"Conflicting staged input filename '{resource.name}'. "
+            "Rename one of the inputs before running."
+        )
+    destination.write_bytes(resource.read_bytes())
     return destination

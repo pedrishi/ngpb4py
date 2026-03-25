@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -193,6 +194,7 @@ _DEFAULT_SCHEMA: dict[str, PrmOption] = {
 
 
 _INPUT_FILE_KEYS = ("filename", "radius_file", "charge_file")
+_PACKAGED_DEFAULT_INPUTS = {"radius_file": "radius.siz", "charge_file": "charge.crg"}
 
 
 @dataclass
@@ -201,6 +203,7 @@ class NgpbConfig:
     schema: dict[str, PrmOption] = field(default_factory=lambda: dict(_DEFAULT_SCHEMA))
     source_prm_path: Path | None = None
     source_dir: Path | None = None
+    explicit_keys: set[str] = field(default_factory=set)
 
     @classmethod
     def defaults(cls) -> NgpbConfig:
@@ -211,13 +214,14 @@ class NgpbConfig:
 
     @classmethod
     def from_prm(cls, prm_path: str, schema: dict[str, PrmOption] | None = None) -> NgpbConfig:
-        resolved_path = Path(prm_path).resolve()
+        resolved_path = _resolve_user_path(prm_path)
         loaded = load_prm(str(resolved_path))
         return cls(
             data=loaded,
             schema=dict(schema) if schema else dict(_DEFAULT_SCHEMA),
             source_prm_path=resolved_path,
             source_dir=resolved_path.parent,
+            explicit_keys=set(loaded),
         )
 
     def with_updates(self, updates: Mapping[str, Any]) -> NgpbConfig:
@@ -228,6 +232,7 @@ class NgpbConfig:
             schema=dict(self.schema),
             source_prm_path=self.source_prm_path,
             source_dir=self.source_dir,
+            explicit_keys=self.explicit_keys | set(updates),
         )
 
     def validate(self) -> None:
@@ -261,21 +266,40 @@ class NgpbConfig:
 
     def iter_input_file_keys(self) -> Iterable[str]:
         for key in _INPUT_FILE_KEYS:
-            if self.data.get(key) is not None:
+            if key in _PACKAGED_DEFAULT_INPUTS or self.data.get(key) is not None:
                 yield key
+
+    def uses_packaged_default_input(self, key: str) -> bool:
+        return key in _PACKAGED_DEFAULT_INPUTS and (
+            key not in self.explicit_keys or self.data.get(key) is None
+        )
 
     def resolve_input_file(self, key: str) -> Path:
         value = self.data.get(key)
         if value is None:
             raise KeyError(key)
         if isinstance(value, Path):
-            return value.resolve()
+            return _resolve_user_path(value, source_dir=self.source_dir)
 
-        candidate = Path(str(value)).expanduser()
-        if candidate.is_absolute():
-            return candidate.resolve()
-        if self.source_dir is not None:
-            return (self.source_dir / candidate).resolve()
-        raise FileNotFoundError(
-            f"Cannot resolve input file for '{key}' from value '{value}' without a source directory"
-        )
+        return _resolve_user_path(str(value), source_dir=self.source_dir)
+
+
+def _resolve_user_path(path_value: str | Path, source_dir: Path | None = None) -> Path:
+    candidate = Path(path_value).expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+
+    candidates = [candidate, Path.cwd() / candidate]
+    if source_dir is not None:
+        candidates.append(source_dir / candidate)
+
+    for candidate_path in candidates:
+        if candidate_path.exists():
+            return candidate_path.resolve()
+
+    return candidates[-1].resolve()
+
+
+def packaged_default_input(key: str):
+    resource_name = _PACKAGED_DEFAULT_INPUTS[key]
+    return files("ngpb4py.data").joinpath(resource_name)

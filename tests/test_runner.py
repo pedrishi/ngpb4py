@@ -121,6 +121,56 @@ def test_runner_stages_prm_referenced_inputs_into_run_workdir(tmp_path, monkeypa
     assert "radius_file = radius.siz" in prmfile_path.read_text()
 
 
+def test_runner_stages_packaged_defaults_when_auxiliary_paths_are_omitted(tmp_path, monkeypatch):
+    source_dir = tmp_path / "source"
+    scratch_dir = tmp_path / "scratch"
+    source_dir.mkdir()
+    scratch_dir.mkdir()
+
+    pdb_path = source_dir / "molecule.pdb"
+    pdb_path.write_text("ATOM\n")
+
+    _, captured_prm_files = install_fake_container_run(monkeypatch)
+    runner = NgpbRunner()
+    config = NgpbConfig.defaults().with_updates({"filetype": "pdb", "filename": str(pdb_path)})
+
+    result = runner.run(
+        config=config, workdir=str(scratch_dir), collect_version=False, keep_files=True
+    )
+
+    prmfile_path = captured_prm_files[0]
+    assert prmfile_path.parent == result.workdir
+    assert (result.workdir / "radius.siz").exists()
+    assert (result.workdir / "charge.crg").exists()
+    assert "radius_file = radius.siz" in prmfile_path.read_text()
+    assert "charge_file = charge.crg" in prmfile_path.read_text()
+
+
+def test_runner_stages_packaged_defaults_for_prm_that_omits_auxiliary_paths(tmp_path, monkeypatch):
+    source_dir = tmp_path / "source"
+    scratch_dir = tmp_path / "scratch"
+    source_dir.mkdir()
+    scratch_dir.mkdir()
+
+    prm_path = source_dir / "options.prm"
+    pdb_path = source_dir / "molecule.pdb"
+    prm_path.write_text("filetype = pdb\nfilename = molecule.pdb\n")
+    pdb_path.write_text("ATOM\n")
+
+    _, captured_prm_files = install_fake_container_run(monkeypatch)
+    runner = NgpbRunner()
+    config = NgpbConfig.from_prm(str(prm_path))
+
+    result = runner.run(
+        config=config, workdir=str(scratch_dir), collect_version=False, keep_files=True
+    )
+
+    prmfile_path = captured_prm_files[0]
+    assert prmfile_path.parent == result.workdir
+    assert (result.workdir / "radius.siz").exists()
+    assert (result.workdir / "charge.crg").exists()
+
+
 def test_runner_raises_when_prm_referenced_input_is_missing(tmp_path):
     source_dir = tmp_path / "source"
     scratch_dir = tmp_path / "scratch"
@@ -135,6 +185,97 @@ def test_runner_raises_when_prm_referenced_input_is_missing(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="filename"):
         runner.run(config=config, workdir=str(scratch_dir), collect_version=False)
+
+
+def test_runner_keeps_explicit_auxiliary_file_failures_strict(tmp_path):
+    source_dir = tmp_path / "source"
+    scratch_dir = tmp_path / "scratch"
+    source_dir.mkdir()
+    scratch_dir.mkdir()
+
+    prm_path = source_dir / "options.prm"
+    pdb_path = source_dir / "molecule.pdb"
+    prm_path.write_text(
+        "filetype = pdb\nfilename = molecule.pdb\nradius_file = missing.siz\ncharge_file = missing.crg\n"
+    )
+    pdb_path.write_text("ATOM\n")
+
+    config = NgpbConfig.from_prm(str(prm_path))
+    runner = NgpbRunner()
+
+    with pytest.raises(FileNotFoundError, match=r"radius_file|charge_file"):
+        runner.run(config=config, workdir=str(scratch_dir), collect_version=False)
+
+
+def test_runner_stages_cwd_relative_inputs_without_source_prm(tmp_path, monkeypatch):
+    source_dir = tmp_path / "inputs"
+    scratch_dir = tmp_path / "scratch"
+    source_dir.mkdir()
+    scratch_dir.mkdir()
+
+    pdb_path = source_dir / "molecule.pdb"
+    siz_path = source_dir / "radius.siz"
+    crg_path = source_dir / "charge.crg"
+    pdb_path.write_text("ATOM\n")
+    siz_path.write_text("1.0\n")
+    crg_path.write_text("1 0.0\n")
+
+    monkeypatch.chdir(source_dir)
+
+    _, captured_prm_files = install_fake_container_run(monkeypatch)
+    runner = NgpbRunner()
+    config = NgpbConfig.defaults().with_updates(
+        {
+            "filetype": "pdb",
+            "filename": "molecule.pdb",
+            "radius_file": "radius.siz",
+            "charge_file": "charge.crg",
+        }
+    )
+
+    result = runner.run(
+        config=config, workdir=str(scratch_dir), collect_version=False, keep_files=True
+    )
+
+    prmfile_path = captured_prm_files[0]
+    assert prmfile_path.parent == result.workdir
+    assert (result.workdir / pdb_path.name).exists()
+    assert (result.workdir / siz_path.name).exists()
+    assert (result.workdir / crg_path.name).exists()
+
+
+def test_runner_prefers_explicit_auxiliary_inputs_over_packaged_defaults(tmp_path, monkeypatch):
+    source_dir = tmp_path / "inputs"
+    scratch_dir = tmp_path / "scratch"
+    source_dir.mkdir()
+    scratch_dir.mkdir()
+
+    pdb_path = source_dir / "molecule.pdb"
+    siz_path = source_dir / "radius.siz"
+    crg_path = source_dir / "charge.crg"
+    pdb_path.write_text("ATOM\n")
+    siz_path.write_text("custom radius\n")
+    crg_path.write_text("custom charge\n")
+
+    monkeypatch.chdir(source_dir)
+
+    runner = NgpbRunner()
+    install_fake_container_run(monkeypatch)
+    config = NgpbConfig.defaults().with_updates(
+        {
+            "filetype": "pdb",
+            "filename": "molecule.pdb",
+            "radius_file": "radius.siz",
+            "charge_file": "charge.crg",
+        }
+    )
+
+    result = runner.run(
+        config=config, workdir=str(scratch_dir), collect_version=False, keep_files=True
+    )
+
+    assert (result.workdir / "radius.siz").read_text() == "custom radius\n"
+    assert (result.workdir / "charge.crg").read_text() == "custom charge\n"
 
 
 def test_runner_ignores_output_only_prm_paths(tmp_path, monkeypatch):
