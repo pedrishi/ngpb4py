@@ -57,9 +57,11 @@ before launching the backend.
 
 ## Work Directory Semantics
 
-`workdir` is a parent scratch directory, not the final run directory.
+`workdir` is an optional parent scratch directory, not the final run directory.
 Each call to `run()` creates a unique child directory named with a generated
-run id.
+run id. If omitted, `run()` uses the current working directory. Relative paths
+are resolved from the current working directory before the child directory is
+created.
 
 This gives two useful properties:
 

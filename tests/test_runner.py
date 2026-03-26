@@ -65,6 +65,36 @@ def test_runner_uses_unique_per_run_workdirs_and_cleans_on_success(tmp_path, mon
     assert result1.provenance["run_id"] == result1.run_id
 
 
+def test_runner_accepts_dict_config_and_applies_defaults(tmp_path, monkeypatch):
+    source_dir = tmp_path / "inputs"
+    scratch_dir = tmp_path / "scratch"
+    source_dir.mkdir()
+    scratch_dir.mkdir()
+
+    pdb_path = source_dir / "molecule.pdb"
+    pdb_path.write_text("ATOM\n")
+
+    _, captured_prm_files = install_fake_container_run(monkeypatch)
+    runner = NgpbRunner()
+
+    result = runner.run(
+        config={"filetype": "pdb", "filename": str(pdb_path)},
+        workdir=str(scratch_dir),
+        collect_version=False,
+        keep_files=True,
+    )
+
+    prmfile_path = captured_prm_files[0]
+    assert prmfile_path.parent == result.workdir
+    assert (result.workdir / pdb_path.name).exists()
+    assert (result.workdir / "radius.siz").exists()
+    assert (result.workdir / "charge.crg").exists()
+    assert "filetype = pdb" in prmfile_path.read_text()
+    assert "filename = molecule.pdb" in prmfile_path.read_text()
+    assert "radius_file = radius.siz" in prmfile_path.read_text()
+    assert "charge_file = charge.crg" in prmfile_path.read_text()
+
+
 def test_runner_keeps_workdir_on_error(tmp_path, monkeypatch):
     workdirs, _ = install_fake_container_run(monkeypatch, fail=True)
     runner = NgpbRunner()
@@ -90,6 +120,32 @@ def test_runner_keeps_workdir_when_keep_files_is_true(tmp_path, monkeypatch):
     assert result.workdir.exists()
     assert result.workdir.parent == tmp_path
     assert (result.workdir / "phi_surf.txt").exists()
+
+
+def test_runner_defaults_workdir_to_current_directory(tmp_path, monkeypatch):
+    install_fake_container_run(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    runner = NgpbRunner()
+
+    result = runner.run(config=make_empty_config(), collect_version=False, keep_files=True)
+
+    assert result.scratch_dir == tmp_path.resolve()
+    assert result.workdir.parent == tmp_path.resolve()
+    assert result.workdir.exists()
+
+
+def test_runner_resolves_relative_workdir_from_current_directory(tmp_path, monkeypatch):
+    install_fake_container_run(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    runner = NgpbRunner()
+
+    result = runner.run(
+        config=make_empty_config(), workdir="scratch", collect_version=False, keep_files=True
+    )
+
+    expected_scratch_dir = (tmp_path / "scratch").resolve()
+    assert result.scratch_dir == expected_scratch_dir
+    assert result.workdir.parent == expected_scratch_dir
 
 
 def test_runner_stages_prm_referenced_inputs_into_run_workdir(tmp_path, monkeypatch):

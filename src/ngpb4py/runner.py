@@ -4,7 +4,9 @@ import logging
 import shutil
 import uuid
 from dataclasses import dataclass
+from os import PathLike
 from pathlib import Path
+from typing import Any
 
 from .config import NgpbConfig, packaged_default_input
 from .container import ContainerBackend
@@ -24,21 +26,22 @@ class NgpbRunner:
     apptainer_path: str | None = None
     container_extra_args: list[str] | None = None
     container_exec_args: list[str] | None = None
-    verbosity: int = 1
+    verbosity: int = 3
 
     def run(
         self,
-        config: NgpbConfig,
-        workdir: str,
+        config: NgpbConfig | dict[str, Any],
+        workdir: str | PathLike[str] | None = None,
         collect_version: bool = True,
         verbose: int | None = None,
         keep_files: bool = False,
     ) -> NgpbResult:
+        config = _coerce_config(config)
         effective_verbose = self.verbosity if verbose is None else verbose
         _configure_logging(effective_verbose)
 
         _LOGGER.info("Starting NextGenPB run")
-        scratch_dir = Path(workdir)
+        scratch_dir = _resolve_scratch_dir(workdir)
         scratch_dir.mkdir(parents=True, exist_ok=True)
         run_id, run_workdir = _create_run_workdir(scratch_dir)
         _LOGGER.debug("Using scratch_dir=%s run_id=%s workdir=%s", scratch_dir, run_id, run_workdir)
@@ -112,6 +115,14 @@ class NgpbRunner:
                 _LOGGER.debug("Removed workdir for run_id=%s", run_id)
 
 
+def _coerce_config(config: NgpbConfig | dict[str, Any]) -> NgpbConfig:
+    if isinstance(config, NgpbConfig):
+        return config
+    if isinstance(config, dict):
+        return NgpbConfig.defaults().with_updates(config)
+    raise TypeError("config must be an NgpbConfig or dict")
+
+
 def _create_run_workdir(scratch_dir: Path) -> tuple[str, Path]:
     while True:
         run_id = uuid.uuid4().hex
@@ -121,6 +132,16 @@ def _create_run_workdir(scratch_dir: Path) -> tuple[str, Path]:
             return run_id, run_workdir
         except FileExistsError:
             continue
+
+
+def _resolve_scratch_dir(workdir: str | PathLike[str] | None) -> Path:
+    if workdir is None:
+        return Path.cwd().resolve()
+
+    scratch_dir = Path(workdir).expanduser()
+    if not scratch_dir.is_absolute():
+        scratch_dir = Path.cwd() / scratch_dir
+    return scratch_dir.resolve()
 
 
 def _stage_inputs(config: NgpbConfig, workdir: Path) -> tuple[Path, dict[str, Path]]:

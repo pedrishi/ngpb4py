@@ -82,8 +82,8 @@ python examples/exercise1/exercise1.py
 
 ## Best Practices
 
-- Use a parent scratch directory such as `/tmp/ngpb-runs` and let `run()` create
-  per-run child directories
+- Omit `workdir` to use the current working directory as the scratch parent, or
+  pass a relative/absolute parent path such as `/tmp/ngpb-runs`
 - Start with `NgpbConfig.defaults()` when you want the upstream
   NextGenPB defaults as a base, then layer only the parameters you need to
   change

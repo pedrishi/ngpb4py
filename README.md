@@ -56,7 +56,6 @@ from ngpb4py import NgpbConfig, NgpbRunner
 config = NgpbConfig.from_prm("examples/exercise1/options.prm")
 result = NgpbRunner(nproc=16).run(
     config=config,
-    workdir="/tmp/ngpb-scratch",
     verbose=3,
 )
 
@@ -166,8 +165,10 @@ Each parsed file is returned as a `PotentialSampleSet` with:
 
 ## Run Behavior and Verbosity
 
-The `workdir` argument is treated as a scratch parent directory. Each call to
-`run()` creates a unique child directory so concurrent runs do not collide.
+The optional `workdir` argument is treated as a scratch parent directory. Each
+call to `run()` creates a unique child directory so concurrent runs do not
+collide. Relative paths are resolved from the current working directory, and
+when `workdir` is omitted `run()` uses the current working directory itself.
 
 Successful runs are cleaned up by default. To keep generated files, logs, and
 staged inputs on disk, pass `keep_files=True`. On failures, the per-run
