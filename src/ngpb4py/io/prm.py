@@ -1,3 +1,5 @@
+"""Parsing and rendering helpers for NextGenPB `.prm` files."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -10,6 +12,7 @@ _BLOCK_ORDER = ("input", "mesh", "model", "surface", "solver")
 
 
 def render_prm(data: Mapping[str, Any], schema: Mapping[str, PrmOption]) -> str:
+    """Render configuration data to canonical `.prm` text."""
     lines = []
     rendered_keys: set[str] = set()
 
@@ -40,6 +43,7 @@ def render_prm(data: Mapping[str, Any], schema: Mapping[str, PrmOption]) -> str:
 
 
 def load_prm(path: str) -> dict[str, Any]:
+    """Load a `.prm` file into a dictionary with basic scalar coercion."""
     parsed: dict[str, Any] = {}
     with open(path) as handle:
         for raw in handle:
@@ -54,6 +58,7 @@ def load_prm(path: str) -> dict[str, Any]:
 
 
 def _coerce_value(value: str) -> Any:
+    """Coerce a `.prm` value token to `int`, `float`, or `str`."""
     cleaned = value.split(maxsplit=1)[0]
     for cast in (int, float):
         try:

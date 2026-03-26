@@ -1,3 +1,5 @@
+"""Container-backed execution backend for NextGenPB."""
+
 from __future__ import annotations
 
 import logging
@@ -17,6 +19,8 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class ExecutionResult:
+    """Low-level execution artefacts returned by a backend run."""
+
     command: list[str]
     stdout_path: Path
     stderr_path: Path
@@ -27,6 +31,8 @@ class ExecutionResult:
 
 @dataclass
 class ContainerBackend:
+    """Execute NextGenPB inside an Apptainer-compatible container image."""
+
     name: str = "container"
     image: str = (
         "https://github.com/concept-lab/NextGenPB/releases/download/NextGenPB_v1.0.0/NextGenPB.sif"
@@ -39,6 +45,7 @@ class ContainerBackend:
     def run(
         self, prm_f: Path, workdir: Path, nproc: int, ngpb_binary: str, collect_version: bool = True
     ) -> ExecutionResult:
+        """Run the configured container backend and collect execution artefacts."""
         runtime_cmd = detect_runtime(self.apptainer_path)
         resolved_image = prepare_container_image("apptainer", self.image)
 
@@ -105,6 +112,7 @@ def _collect_provenance(
     ngpb_binary: str,
     collect_version: bool = True,
 ) -> dict[str, str]:
+    """Collect reproducibility metadata for a backend execution."""
     provenance = {"backend": backend_name, "nproc": str(nproc), "command": " ".join(command)}
     if container_digest:
         provenance["container_digest"] = container_digest
@@ -116,6 +124,7 @@ def _collect_provenance(
 
 
 def _detect_ngpb_version(ngpb_binary: str) -> str | None:
+    """Best-effort detection of the local NextGenPB binary version."""
     try:
         output = subprocess.check_output([ngpb_binary, "--version"], stderr=subprocess.STDOUT)
         return output.decode(errors="replace").strip().splitlines()[0]

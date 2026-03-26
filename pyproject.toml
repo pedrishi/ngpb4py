@@ -7,7 +7,7 @@ source-include = ["src/ngpb4py/data/**"]
 
 [project]
 name = "ngpb4py"
-version = "0.5.1"
+version = "0.5.2"
 description = "Thin Python wrapper for NextGenPB"
 readme = "README.md"
 authors = [

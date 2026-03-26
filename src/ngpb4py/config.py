@@ -1,3 +1,5 @@
+"""Configuration objects and schema helpers for NextGenPB runs."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
@@ -13,6 +15,8 @@ _UNSET = object()
 
 @dataclass(frozen=True)
 class PrmOption:
+    """Schema entry describing a supported `.prm` option."""
+
     name: str
     default: Any
     value_type: type
@@ -23,6 +27,7 @@ class PrmOption:
 
     @property
     def has_default(self) -> bool:
+        """Whether the option has a concrete default value."""
         return self.default is not _UNSET
 
 
@@ -199,6 +204,8 @@ _PACKAGED_DEFAULT_INPUTS = {"radius_file": "radius.siz", "charge_file": "charge.
 
 @dataclass
 class NgpbConfig:
+    """Validated NextGenPB configuration plus input-file provenance."""
+
     data: dict[str, Any] = field(default_factory=dict)
     schema: dict[str, PrmOption] = field(default_factory=lambda: dict(_DEFAULT_SCHEMA))
     source_prm_path: Path | None = None
@@ -207,6 +214,7 @@ class NgpbConfig:
 
     @classmethod
     def defaults(cls) -> NgpbConfig:
+        """Build a configuration populated with documented upstream defaults."""
         data = {
             name: option.default for name, option in _DEFAULT_SCHEMA.items() if option.has_default
         }
@@ -214,6 +222,7 @@ class NgpbConfig:
 
     @classmethod
     def from_prm(cls, prm_path: str, schema: dict[str, PrmOption] | None = None) -> NgpbConfig:
+        """Load a configuration from an existing `.prm` file."""
         resolved_path = _resolve_user_path(prm_path)
         loaded = load_prm(str(resolved_path))
         return cls(
@@ -225,6 +234,7 @@ class NgpbConfig:
         )
 
     def with_updates(self, updates: Mapping[str, Any]) -> NgpbConfig:
+        """Return a copy with selected option values overridden."""
         merged = dict(self.data)
         merged.update(updates)
         return NgpbConfig(
@@ -236,6 +246,7 @@ class NgpbConfig:
         )
 
     def validate(self) -> None:
+        """Validate configured values against the known schema."""
         for key, option in self.schema.items():
             if key not in self.data:
                 continue
@@ -253,28 +264,34 @@ class NgpbConfig:
                 raise ValueError(f"{key} expects one of {{{allowed}}}, got {value!r}")
 
     def to_prm(self) -> str:
+        """Render the configuration to canonical `.prm` text."""
         self.validate()
         return render_prm(self.data, self.schema)
 
     def iter_items(self) -> Iterable[tuple[str, Any]]:
+        """Iterate over stored option/value pairs."""
         return self.data.items()
 
     def prm_filename(self) -> str:
+        """Return the staged `.prm` filename to use for a run."""
         if self.source_prm_path is not None:
             return self.source_prm_path.name
         return "ngpb.prm"
 
     def iter_input_file_keys(self) -> Iterable[str]:
+        """Yield input-file keys that should be staged for execution."""
         for key in _INPUT_FILE_KEYS:
             if key in _PACKAGED_DEFAULT_INPUTS or self.data.get(key) is not None:
                 yield key
 
     def uses_packaged_default_input(self, key: str) -> bool:
+        """Whether an auxiliary input should come from packaged defaults."""
         return key in _PACKAGED_DEFAULT_INPUTS and (
             key not in self.explicit_keys or self.data.get(key) is None
         )
 
     def resolve_input_file(self, key: str) -> Path:
+        """Resolve an input-file option against known user and source paths."""
         value = self.data.get(key)
         if value is None:
             raise KeyError(key)
@@ -285,6 +302,7 @@ class NgpbConfig:
 
 
 def _resolve_user_path(path_value: str | Path, source_dir: Path | None = None) -> Path:
+    """Resolve a user-supplied path against the current and source directories."""
     candidate = Path(path_value).expanduser()
     if candidate.is_absolute():
         return candidate.resolve()
@@ -301,5 +319,6 @@ def _resolve_user_path(path_value: str | Path, source_dir: Path | None = None) -
 
 
 def packaged_default_input(key: str):
+    """Return the packaged default resource for an auxiliary input key."""
     resource_name = _PACKAGED_DEFAULT_INPUTS[key]
     return files("ngpb4py.data").joinpath(resource_name)

@@ -1,3 +1,5 @@
+"""High-level execution entrypoints for running NextGenPB."""
+
 from __future__ import annotations
 
 import logging
@@ -18,6 +20,8 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class NgpbRunner:
+    """Runner that stages inputs, executes the solver, and parses results."""
+
     nproc: int = 1
     ngpb_binary: str = "ngpb"
     container_image: str = (
@@ -36,6 +40,7 @@ class NgpbRunner:
         verbose: int | None = None,
         keep_files: bool = False,
     ) -> NgpbResult:
+        """Run NextGenPB for a configuration and return parsed results."""
         config = _coerce_config(config)
         effective_verbose = self.verbosity if verbose is None else verbose
         _configure_logging(effective_verbose)
@@ -116,6 +121,7 @@ class NgpbRunner:
 
 
 def _coerce_config(config: NgpbConfig | dict[str, Any]) -> NgpbConfig:
+    """Normalize user input to an `NgpbConfig` instance."""
     if isinstance(config, NgpbConfig):
         return config
     if isinstance(config, dict):
@@ -124,6 +130,7 @@ def _coerce_config(config: NgpbConfig | dict[str, Any]) -> NgpbConfig:
 
 
 def _create_run_workdir(scratch_dir: Path) -> tuple[str, Path]:
+    """Create a unique per-run working directory inside a scratch directory."""
     while True:
         run_id = uuid.uuid4().hex
         run_workdir = scratch_dir / run_id
@@ -135,6 +142,7 @@ def _create_run_workdir(scratch_dir: Path) -> tuple[str, Path]:
 
 
 def _resolve_scratch_dir(workdir: str | PathLike[str] | None) -> Path:
+    """Resolve the scratch parent directory for a run."""
     if workdir is None:
         return Path.cwd().resolve()
 
@@ -145,6 +153,7 @@ def _resolve_scratch_dir(workdir: str | PathLike[str] | None) -> Path:
 
 
 def _stage_inputs(config: NgpbConfig, workdir: Path) -> tuple[Path, dict[str, Path]]:
+    """Stage the `.prm` file and declared inputs into the run workdir."""
     staged_data = dict(config.data)
     staged_paths: dict[str, Path] = {}
 
@@ -171,6 +180,7 @@ def _stage_inputs(config: NgpbConfig, workdir: Path) -> tuple[Path, dict[str, Pa
 
 
 def _copy_input_file(path: Path, workdir: Path) -> Path:
+    """Copy a user-provided input file into the run workdir."""
     destination = workdir / path.name
     if destination.exists():
         source_resolved = path.resolve()
@@ -186,6 +196,7 @@ def _copy_input_file(path: Path, workdir: Path) -> Path:
 
 
 def _copy_packaged_input_file(resource, workdir: Path) -> Path:
+    """Copy a packaged auxiliary input file into the run workdir."""
     destination = workdir / resource.name
     if destination.exists():
         raise ValueError(

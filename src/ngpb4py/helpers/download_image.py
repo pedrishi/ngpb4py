@@ -1,3 +1,5 @@
+"""Helpers for downloading and caching remote container images."""
+
 import contextlib
 import sys
 import time
@@ -8,6 +10,7 @@ from urllib.request import urlopen
 
 
 def download_cached_image(url: str, destination: Path) -> None:
+    """Download an image once, reusing the cached file when present."""
     with path_lock(destination):
         if destination.exists() and destination.stat().st_size > 0:
             return
@@ -15,6 +18,7 @@ def download_cached_image(url: str, destination: Path) -> None:
 
 
 def download_with_progress(url: str, destination: Path) -> None:
+    """Download a file while reporting progress to standard error."""
     tmp_destination = destination.with_suffix(destination.suffix + f".{uuid.uuid4().hex}.part")
     stderr_is_tty = hasattr(sys.stderr, "isatty") and bool(sys.stderr.isatty())
     printed_non_tty = False
@@ -62,6 +66,7 @@ def download_with_progress(url: str, destination: Path) -> None:
 
 @contextlib.contextmanager
 def path_lock(path: Path, timeout_s: float = 300.0, poll_interval_s: float = 0.1) -> Iterator[None]:
+    """Acquire a coarse filesystem lock for a cache path."""
     lock_path = path.with_suffix(path.suffix + ".lock")
     deadline = time.monotonic() + timeout_s
 
@@ -81,6 +86,7 @@ def path_lock(path: Path, timeout_s: float = 300.0, poll_interval_s: float = 0.1
 
 
 def format_progress_bar(downloaded_bytes: int, total_bytes: int) -> str:
+    """Render a simple textual progress bar for a download."""
     ratio = min(downloaded_bytes / total_bytes, 1.0)
     width = 30
     filled = int(ratio * width)
@@ -93,5 +99,6 @@ def format_progress_bar(downloaded_bytes: int, total_bytes: int) -> str:
 
 
 def format_size(size_bytes: int) -> str:
+    """Format a byte count in MiB for user-facing progress output."""
     mib = size_bytes / (1024 * 1024)
     return f"{mib:.1f} MiB"

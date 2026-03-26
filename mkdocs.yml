@@ -1,19 +1,21 @@
 site_name: ngpb4py
-site_description: Thin Python wrapper for NextGenPB
+site_description: Python wrapper for running NextGenPB with containerized execution
 site_url: https://pedrishi.github.io/ngpb4py
 repo_url: https://github.com/pedrishi/ngpb4py
 repo_name: pedrishi/ngpb4py
 
 theme:
-  name: material
+  name: readthedocs
 
 nav:
-  - Home: index.md
-  - Getting Started: getting-started.md
+  - Overview: index.md
+  - Installation: installation.md
+  - Quick Start: quickstart.md
+  - Configuration: configuration.md
   - Running Jobs: running-jobs.md
-  - Working With Results: results.md
-  - Architecture: architecture.md
-  - Reference: reference.md
+  - Results: results.md
+  - API Reference: api.md
+  - Development: development.md
 
 watch:
   - src
@@ -25,7 +27,13 @@ plugins:
         python:
           options:
             docstring_style: numpy
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
 
 markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
   - pymdownx.highlight
   - pymdownx.superfences

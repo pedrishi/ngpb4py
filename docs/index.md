@@ -1,56 +1,33 @@
 # ngpb4py
 
-`ngpb4py` is a thin Python wrapper around
-[NextGenPB](https://github.com/concept-lab/NextGenPB). It focuses on a small,
-typed API for preparing `.prm` inputs with NextGenPB defaults,
-running the solver through an Apptainer backend, and parsing the solver
-log into structured Python objects.
+`ngpb4py` is a Python interface for preparing, running, and parsing
+[NextGenPB](https://github.com/concept-lab/NextGenPB) jobs.
 
-## What It Provides
+The package is intentionally small. It focuses on three tasks:
 
-- `NgpbConfig` for working with parameter data, loading `.prm` files, and staging referenced inputs
-- `NgpbRunner` for creating an isolated run directory and launching NextGenPB
-- `NgpbResult` for structured log data, metrics, provenance, and parsed output
-  files
-- A pluggable backend protocol with a built-in Apptainer implementation
+1. building or loading a `.prm` configuration
+2. staging required input files into an isolated run directory
+3. turning the solver log and supported output files into structured Python objects
 
-## Typical Workflow
+## Core Concepts
 
-```python
-from ngpb4py import NgpbConfig, NgpbRunner
+### `NgpbConfig`
 
-config = NgpbConfig.defaults().with_updates(
-    {
-        "filetype": "pdb",
-        "filename": "protein.pdb",
-        "radius_file": "radius.siz",
-        "charge_file": "charge.crg",
-        "scale": 3.0,
-    }
-)
+Represents a NextGenPB configuration in Python. It can be created from defaults,
+loaded from an existing `.prm`, updated programmatically, validated, and rendered
+back to text.
 
-runner = NgpbRunner(nproc=8)
-result = runner.run(config=config, workdir="/tmp/ngpb-runs", keep_files=False)
+### `NgpbRunner`
 
-print(result.log.grid.total_nodes)
-print(result.metrics["energy.total"])
-```
+Creates a per-run working directory, stages the `.prm` file plus referenced
+inputs, launches the container backend, and returns an `NgpbResult`.
 
-## Documentation Guide
+### `NgpbResult`
 
-- [Getting Started](getting-started.md) explains installation, runtime
-  requirements, and the first successful run
-- [Running Jobs](running-jobs.md) covers configuration, staged inputs,
-  work-directory behavior, and verbosity
-- [Working With Results](results.md) explains parsed logs, metrics, provenance,
-  and output files
-- [Architecture](architecture.md) describes the package layout and extension
-  points
-- [Reference](reference.md) contains the generated API reference
+Collects run metadata, parsed log sections, known output files, and simple
+metrics suitable for downstream analysis.
 
-## Design Principles
+## When To Use It
 
-- Mirror the documented NextGenPB parameter surface while keeping the Python API explicit
-- Prefer typed Python objects over ad hoc text parsing in user code
-- Treat each `run()` call as an isolated execution with its own work directory
-- Preserve failed runs for debugging and clean up successful runs by default
+Use `ngpb4py` when you want a Python-native workflow around NextGenPB without
+rewriting solver inputs and outputs by hand for each run.

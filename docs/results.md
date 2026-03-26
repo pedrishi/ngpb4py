@@ -1,102 +1,53 @@
-# Working With Results
+# Results
 
-## Result Object
+## `NgpbResult`
 
-`NgpbRunner.run()` returns an `NgpbResult` containing execution metadata and
-parsed solver output.
+`NgpbRunner.run()` returns an `NgpbResult` object containing:
 
-```python
-result = runner.run(config=config, workdir="/tmp/ngpb-runs")
-
-print(result.run_id)
-print(result.command)
-print(result.stdout_path)
-print(result.provenance)
-```
-
-Important fields:
-
-- `run_id`: unique identifier for the execution directory
-- `workdir`: per-run child directory
-- `stdout_path` and `stderr_path`: captured backend logs
-- `output_paths`: files discovered after execution
-- `parsed_outputs`: parsed numeric data from known potential output files
-- `log`: structured representation of the documented terminal log sections
-- `metrics`: flattened numeric metrics derived from the parsed log
-- `provenance`: backend name, effective command, process count, and optional
-  container digest and solver version
+- run identifiers and file locations
+- the command used to invoke the backend
+- parsed log sections
+- parsed supported output files
+- simple derived metrics
+- provenance metadata
 
 ## Parsed Log Sections
 
-`result.log` exposes typed section objects when the corresponding sections were
-present in the solver output:
+The parsed log is available at `result.log`. When present in the solver output,
+the following sections are mapped to typed objects:
 
-- `system`
-- `domain`
-- `surface`
-- `grid`
-- `solver`
-- `energies`
+- `result.log.system`
+- `result.log.domain`
+- `result.log.surface`
+- `result.log.grid`
+- `result.log.solver`
+- `result.log.energies`
 
 Example:
 
 ```python
-if result.log.grid is not None:
-    print(result.log.grid.total_nodes)
-
-if result.log.solver is not None:
-    print(result.log.solver.iteration_count)
+iterations = result.log.solver.iteration_count
+nodes = result.log.grid.total_nodes
+energy = result.log.energies.total_electrostatic_energy_kt
 ```
-
-The parser is intentionally conservative: missing sections stay `None`, and
-only recognized fields are surfaced as structured values.
-
-## Derived Metrics
-
-`NgpbResult.metrics` collects a small set of stable numeric metrics that are
-useful for monitoring and regression checks:
-
-- `mesh.elements`
-- `mesh.nodes`
-- `solver.iterations`
-- `energy.total`
-- `energy.solvation`
-- `energy.coulombic`
-- `energy.direct_ionic`
-
-This is a convenience layer over `result.log`, not a separate source of truth.
 
 ## Parsed Output Files
 
-If NextGenPB writes any of the following files, `ngpb4py` parses them into
-`PotentialSampleSet` objects:
+If these files are produced by NextGenPB, `ngpb4py` parses them automatically:
 
 - `phi_surf.txt`
 - `phi_nodes.txt`
 - `phi_on_atoms.txt`
 
-Each parsed output contains:
-
-- `coordinates`: `list[list[float]]` shaped as `[x, y, z]`
-- `potentials`: `list[float]`
-
-Example:
+Each file is exposed as a `PotentialSampleSet` in `result.parsed_outputs`.
 
 ```python
-phi_surf = result.parsed_outputs.get("phi_surf.txt")
-if phi_surf is not None:
-    print(phi_surf.coordinates[:3])
-    print(phi_surf.potentials[:3])
+phi_surf = result.parsed_outputs["phi_surf.txt"]
+print(phi_surf.coordinates[:3])
+print(phi_surf.potentials[:3])
 ```
 
-Only numeric rows with exactly four columns are accepted. Headers, comments,
-and malformed rows are skipped.
+## Metrics
 
-## Debugging Failed Runs
-
-When a run fails, the work directory is preserved automatically. In that case
-the most useful artifacts are usually:
-
-- `result.stdout_path` and `result.stderr_path` for backend and solver output
-- `result.workdir` for staged inputs and generated files
-- `result.log_excerpt` when you need a quick tail of stdout in application logs
+`result.metrics` provides a flattened dictionary of commonly useful values, such
+as mesh counts, iteration counts, and selected energy terms.

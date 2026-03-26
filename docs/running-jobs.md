@@ -1,112 +1,55 @@
 # Running Jobs
 
-## Building Configuration
-
-`NgpbConfig` stores parameter data as a mapping keyed by the exact `.prm`
-option names used by NextGenPB. The built-in schema mirrors the documented
-parameters from the NextGenPB parameter-file guide, including explicit upstream
-defaults, basic validation for known option types, and the documented PRM block
-metadata for each known key such as `input`, `mesh`, `model`, `surface`, and
-`solver`.
-
-```python
-from ngpb4py import NgpbConfig
-
-config = NgpbConfig.defaults().with_updates(
-    {
-        "filetype": "pdb",
-        "filename": "protein.pdb",
-        "radius_file": "radius.siz",
-        "charge_file": "charge.crg",
-        "write_pqr": 1,
-        "mesh_shape": 0,
-        "scale": 3.0,
-        "potential_map": 1,
-    }
-)
-```
-
-The built-in schema validates known options before rendering while still
-preserving unknown keys loaded from existing `.prm` files:
-
-```python
-config.validate()
-prm_text = config.to_prm()
-```
-
-## Running An Existing `.prm`
-
-When you already have a prepared `.prm` file, load it into `NgpbConfig` and
-run it directly. Runtime inputs referenced by keys such as `filename`,
-`radius_file`, and `charge_file` are resolved relative to the `.prm` file:
+## Basic Execution
 
 ```python
 from ngpb4py import NgpbConfig, NgpbRunner
 
-runner = NgpbRunner()
 config = NgpbConfig.from_prm("options.prm")
-
-result = runner.run(config=config, workdir="/tmp/ngpb-runs")
+result = NgpbRunner(nproc=8).run(config=config)
 ```
 
-If `radius_file` or `charge_file` are omitted, `run()` stages packaged defaults
-named `radius.siz` and `charge.crg`. If those keys are explicitly provided,
-their paths are resolved from the current working directory, absolute path, or
-relative to the source `.prm` file. Missing explicit input files still fail
-before launching the backend.
+## Working Directories
 
-## Work Directory Semantics
+`workdir` is treated as a scratch parent directory, not the final run directory.
+Each call to `run()` creates a unique child directory inside it.
 
-`workdir` is an optional parent scratch directory, not the final run directory.
-Each call to `run()` creates a unique child directory named with a generated
-run id. If omitted, `run()` uses the current working directory. Relative paths
-are resolved from the current working directory before the child directory is
-created.
+```python
+result = NgpbRunner().run(config=config, workdir="scratch", keep_files=True)
+print(result.scratch_dir)
+print(result.workdir)
+```
 
-This gives two useful properties:
+This makes concurrent runs safer because they do not overwrite each other's
+files.
 
-- concurrent runs do not collide
-- a failed run can be preserved without affecting later runs
+## Verbosity
 
-On success, the child directory is removed unless `keep_files=True`. On failure,
-the child directory is always kept.
+Wrapper logging can be controlled globally on the runner or per run:
 
-## Logging And Verbosity
+```python
+runner = NgpbRunner(verbosity=1)
+result = runner.run(config=config, verbose=3)
+```
 
-Wrapper logging is controlled by `NgpbRunner(verbosity=...)` or the per-run
-`verbose=` argument:
+Verbosity levels:
 
 - `0`: warnings and errors only
-- `1`: high-level progress
-- `2`: wrapper debug logging
-- `3`: wrapper debug logging plus streamed backend output when available
+- `1`: high-level progress messages
+- `2`: debug logging from the wrapper
+- `3`: debug logging plus streamed backend output
 
-This setting affects the wrapper logs written to the Python process output. The
-parsed NextGenPB log is still available later via `result.log`.
+## Container Options
 
-## Runtime Configuration
-
-`ngpb4py` always runs NextGenPB through the built-in container backend. Common
-customization points are:
+You can customize the runtime invocation:
 
 ```python
 runner = NgpbRunner(
-    nproc=16,
-    ngpb_binary="ngpb",
-    container_exec_args=["--nv"],
-    container_extra_args=["--debug"],
+    container_image="/data/images/NextGenPB.sif",
+    container_exec_args=["--containall"],
+    container_extra_args=["--silent"],
 )
 ```
 
-- `container_exec_args` are inserted into the runtime's `exec` invocation
-- `container_extra_args` are injected earlier in the full runtime command
-- `container_image` can be a local `.sif` or a remote `.sif` URL
-
-## Operational Guidance
-
-- Prefer absolute paths for runtime executables and externally managed files
-- Keep auxiliary input filenames unique because staging rejects name conflicts
-- Use a stable output prefix if downstream automation depends on generated file
-  names
-- Disable version probing with `collect_version=False` if `ngpb --version` is
-  unavailable in your environment
+Use `container_exec_args` for flags passed to `apptainer exec`, and
+`container_extra_args` for flags inserted immediately after the runtime command.

@@ -1,3 +1,5 @@
+"""Utilities for preparing and running the containerized solver backend."""
+
 import os
 import shutil
 import subprocess
@@ -10,6 +12,7 @@ from ngpb4py.helpers.download_image import download_cached_image
 
 
 def prepare_container_image(runtime: str, image: str) -> str:
+    """Resolve a container image path, downloading remote Apptainer images if needed."""
     if runtime != "apptainer":
         return image
     if not is_remote_image(image):
@@ -32,11 +35,13 @@ def prepare_container_image(runtime: str, image: str) -> str:
 
 
 def is_remote_image(image: str) -> bool:
+    """Return whether a container image reference points to HTTP(S)."""
     scheme = urlparse(image).scheme.lower()
     return scheme in {"http", "https"}
 
 
 def detect_runtime(apptainer_path: str | None = None) -> str:
+    """Locate the Apptainer runtime command to execute."""
     if apptainer_path:
         validate_apptainer_path(apptainer_path)
         return apptainer_path
@@ -47,6 +52,7 @@ def detect_runtime(apptainer_path: str | None = None) -> str:
 
 
 def validate_apptainer_path(apptainer_path: str) -> None:
+    """Validate a user-supplied Apptainer binary path."""
     if not Path(apptainer_path).is_absolute():
         raise RuntimeError("Custom Apptainer path must be an absolute path")
 
@@ -54,6 +60,7 @@ def validate_apptainer_path(apptainer_path: str) -> None:
 def execute_command(
     command: list[str], workdir: Path, stdout_path: Path, stderr_path: Path, stream_output: bool
 ) -> None:
+    """Execute a command and persist stdout and stderr to log files."""
     if stream_output:
         execute_command_streaming(command, workdir, stdout_path, stderr_path)
         return
@@ -72,6 +79,7 @@ def execute_command(
 def execute_command_streaming(
     command: list[str], workdir: Path, stdout_path: Path, stderr_path: Path
 ) -> None:
+    """Execute a command while streaming its output live and to log files."""
     with (
         stdout_path.open("w", encoding="utf-8") as stdout_file,
         stderr_path.open("w", encoding="utf-8") as stderr_file,
@@ -99,6 +107,7 @@ def execute_command_streaming(
 
 
 def stream_pipe(pipe, destination_file, destination_stream) -> None:
+    """Mirror a process output pipe to a file and terminal stream."""
     if pipe is None:
         return
     for line in pipe:
@@ -109,6 +118,7 @@ def stream_pipe(pipe, destination_file, destination_stream) -> None:
 
 
 def container_digest(image: str) -> str | None:
+    """Return the SHA-256 digest for a local container image when available."""
     try:
         if Path(image).exists():
             output = subprocess.check_output(["sha256sum", image], stderr=subprocess.DEVNULL)

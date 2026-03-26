@@ -1,3 +1,5 @@
+"""Structured parsers for documented NextGenPB terminal output."""
+
 from __future__ import annotations
 
 import re
@@ -19,12 +21,16 @@ _FIELD_NUMBER_RE = re.compile(r":\s*(" + _FLOAT_RE + r")(?:\s+\[[^\]]+\])?\s*$")
 
 @dataclass(frozen=True)
 class AxisBounds:
+    """Minimum and maximum coordinates for one axis."""
+
     minimum: float
     maximum: float
 
 
 @dataclass(frozen=True)
 class BoxBounds:
+    """Axis-aligned 3D bounds parsed from the domain section."""
+
     x: AxisBounds
     y: AxisBounds
     z: AxisBounds
@@ -32,6 +38,8 @@ class BoxBounds:
 
 @dataclass(frozen=True)
 class GridSubdivisions:
+    """Grid subdivision counts along each axis."""
+
     nx: int
     ny: int
     nz: int
@@ -39,6 +47,8 @@ class GridSubdivisions:
 
 @dataclass
 class SystemInfo:
+    """Parsed values from the solver's system-information section."""
+
     parameters_file: str | None = None
     pqr_file: str | None = None
     number_of_atoms: int | None = None
@@ -51,6 +61,8 @@ class SystemInfo:
 
 @dataclass
 class DomainInfo:
+    """Parsed values describing the simulation domain and mesh."""
+
     scale: float | None = None
     center_of_system_angstrom: tuple[float, float, float] | None = None
     perfil_outer_box: float | None = None
@@ -62,12 +74,16 @@ class DomainInfo:
 
 @dataclass
 class SurfaceBuildInfo:
+    """Parsed status information for surface generation."""
+
     cavity_detection_time_s: float | None = None
     completed: bool | None = None
 
 
 @dataclass
 class GridBuildInfo:
+    """Parsed counts reported while building the computational grid."""
+
     total_nodes: int | None = None
     total_quadrants: int | None = None
     rank_count: int | None = None
@@ -75,6 +91,8 @@ class GridBuildInfo:
 
 @dataclass
 class SolverInfo:
+    """Parsed solver configuration and convergence information."""
+
     boundary_conditions: str | None = None
     rho_calculation_time_ms: float | None = None
     initial_vector: str | None = None
@@ -88,6 +106,8 @@ class SolverInfo:
 
 @dataclass
 class ElectrostaticEnergy:
+    """Parsed electrostatic energy terms reported by NextGenPB."""
+
     net_charge_e: float | None = None
     flux_charge_e: float | None = None
     polarization_energy_kt: float | None = None
@@ -98,6 +118,8 @@ class ElectrostaticEnergy:
 
 @dataclass
 class ParsedLog:
+    """Top-level structured representation of a NextGenPB terminal log."""
+
     system: SystemInfo | None = None
     domain: DomainInfo | None = None
     surface: SurfaceBuildInfo | None = None
@@ -108,6 +130,7 @@ class ParsedLog:
     section_text: dict[str, str] = field(default_factory=dict)
 
     def section_count(self) -> int:
+        """Return the number of known log sections that were parsed."""
         return sum(
             section is not None
             for section in (
@@ -121,6 +144,7 @@ class ParsedLog:
         )
 
     def to_metrics(self) -> dict[str, float]:
+        """Flatten selected parsed values into metrics-friendly keys."""
         metrics: dict[str, float] = {}
         if self.grid is not None:
             if self.grid.total_quadrants is not None:
@@ -142,6 +166,7 @@ class ParsedLog:
 
 
 def parse_log(text: str) -> ParsedLog:
+    """Parse documented NextGenPB terminal output into structured sections."""
     preamble_lines, sections = _split_sections(text)
     selected_files = _parse_selected_files(preamble_lines)
 
@@ -173,6 +198,7 @@ def parse_log(text: str) -> ParsedLog:
 
 
 def parse_log_metrics(text: str) -> dict[str, float]:
+    """Parse a log and return the derived metrics dictionary."""
     return parse_log(text).to_metrics()
 
 
