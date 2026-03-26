@@ -3,7 +3,7 @@
 `ngpb4py` is a thin Python wrapper around
 [NextGenPB](https://github.com/concept-lab/NextGenPB). It focuses on a small,
 typed API for preparing `.prm` inputs with NextGenPB defaults,
-running the solver through a container backend, and parsing the solver
+running the solver through an Apptainer backend, and parsing the solver
 log into structured Python objects.
 
 ## What It Provides
@@ -12,7 +12,7 @@ log into structured Python objects.
 - `NgpbRunner` for creating an isolated run directory and launching NextGenPB
 - `NgpbResult` for structured log data, metrics, provenance, and parsed output
   files
-- A pluggable backend protocol with a built-in container implementation
+- A pluggable backend protocol with a built-in Apptainer implementation
 
 ## Typical Workflow
 

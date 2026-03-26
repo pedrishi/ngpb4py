@@ -7,19 +7,38 @@
 ## Features
 
 - Typed configuration, runner, and result objects
-- Container-based execution with Apptainer as the default runtime
+- Container-based execution with Apptainer
 - Structured parsing for documented log sections and potential output files
 - Per-run scratch directories with automatic cleanup on successful runs
 
 ## Installation
 
-To install the latest stable version run:
+The recommended installation path is Conda on Linux so the environment can
+provide both `ngpb4py` and `apptainer` together:
+
+```sh
+conda env create -f environment.yml
+conda activate ngpb4py
+```
+
+Verify that the container runtime is available inside the environment:
+
+```sh
+apptainer --version
+python -c "import ngpb4py; print('ngpb4py import OK')"
+```
+
+The bundled Conda environment uses `conda-forge` for `apptainer`, which is
+currently available for Linux platforms. On macOS or Windows, or if you prefer
+manual environment management, install the package with `pip` and provide
+Apptainer separately:
 
 ```sh
 pip install ngpb4py
 ```
 
-> **Warning:** A supported container runtime must be installed on your system. See the [Apptainer installation guide](https://apptainer.org/docs/user/latest/quick_start.html) if you plan to use Apptainer or Singularity.
+If you plan to use Apptainer outside the Conda environment, see the
+[Apptainer installation guide](https://apptainer.org/docs/user/latest/quick_start.html).
 
 By default ngpb4py searches your system PATH for the Apptainer executable.
 
@@ -66,11 +85,11 @@ The repository includes runnable examples under `examples/` that mirror the
 - `examples/exercise3/`
 - `examples/exercise4/`
 
-Run an example from the repository root with Python after installing the
-package:
+Run an example from the repository root:
 
 ```bash
-python examples/exercise1/exercise1.py
+cd examples/exercise1/
+python exercise1.py
 ```
 
 
@@ -89,28 +108,23 @@ Then run the full test suite:
 uv run --group dev python -m pytest
 ```
 
-## Runtime Backends
+## Runtime Backend
 
 `ngpb4py` always runs NextGenPB in a container. By default, `NgpbRunner` uses
 Apptainer with the published SIF image:
 
 <https://github.com/concept-lab/NextGenPB/releases/download/NextGenPB_v1.0.0/NextGenPB.sif>
 
-If you prefer Docker, build or provide a Docker image and pass the image name to
-`NgpbRunner`.
-
-If you want to keep using Apptainer or Singularity with a different image, pass
-an alternate local or remote `.sif` via `container_image`:
+If you want to use a different image, pass an alternate local or remote `.sif`
+via `container_image`:
 
 ```python
 runner = NgpbRunner(
-    container_runtime="apptainer",
     container_image="/data/images/NextGenPB-custom.sif",
 )
 ```
 
-Remote `.sif` URLs are downloaded and cached automatically for
-Apptainer-compatible runtimes.
+Remote `.sif` URLs are downloaded and cached automatically for Apptainer.
 
 To add flags directly to `apptainer exec`, pass `container_exec_args`:
 

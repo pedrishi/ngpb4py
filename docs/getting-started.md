@@ -3,22 +3,33 @@
 ## Requirements
 
 - Python `3.10+`
-- A supported container runtime:
-  - `apptainer` or `singularity`
-  - `docker`
+- `apptainer`
 
-`NgpbRunner` defaults to the published NextGenPB SIF image and prefers
-Apptainer-compatible runtimes. When using a remote SIF image with Apptainer or
-Singularity, `ngpb4py` caches the download locally.
+`NgpbRunner` defaults to the published NextGenPB SIF image. When using a
+remote SIF image with Apptainer, `ngpb4py` caches the download locally.
 
 ## Install The Package
+
+On Linux, prefer the Conda environment included in this repository so both
+`ngpb4py` and `apptainer` are installed together:
+
+```bash
+conda env create -f environment.yml
+conda activate ngpb4py
+apptainer --version
+python -c "import ngpb4py; print('ngpb4py import OK')"
+```
+
+The Conda environment uses `conda-forge` for `apptainer`, which is currently
+available on Linux platforms. If Conda-provided Apptainer is not available on
+your platform, install `ngpb4py` with `pip` and set up Apptainer separately:
 
 ```bash
 pip install ngpb4py
 ```
 
 If you are working from a clone of the repository and want the documentation
-and test tooling too:
+and test tooling too, keep using the existing `uv` development workflow:
 
 ```bash
 uv sync --group dev
@@ -40,14 +51,11 @@ result = runner.run(config=config, workdir="/tmp/ngpb-runs")
 print(result.log.energies.total_electrostatic_energy_kt)
 ```
 
-## Using A Custom Runtime Or Image
-
-Use `container_runtime` to force a runtime instead of relying on auto-detection:
+## Using A Custom Image
 
 ```python
 runner = NgpbRunner(
-    container_runtime="docker",
-    container_image="ghcr.io/example/nextgenpb:latest",
+    container_image="/data/images/NextGenPB-custom.sif",
 )
 ```
 

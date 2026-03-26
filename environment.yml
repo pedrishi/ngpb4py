@@ -1,0 +1,9 @@
+name: ngpb4py
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10,<4.0
+  - pip
+  - apptainer
+  - pip:
+      - ngpb4py

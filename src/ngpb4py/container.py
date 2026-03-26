@@ -31,7 +31,6 @@ class ContainerBackend:
     image: str = (
         "https://github.com/concept-lab/NextGenPB/releases/download/NextGenPB_v1.0.0/NextGenPB.sif"
     )
-    runtime: str | None = "apptainer"
     apptainer_path: str | None = None
     extra_args: list[str] | None = None
     exec_args: list[str] | None = None
@@ -40,36 +39,23 @@ class ContainerBackend:
     def run(
         self, prm_f: Path, workdir: Path, nproc: int, ngpb_binary: str, collect_version: bool = True
     ) -> ExecutionResult:
-        runtime, runtime_cmd = detect_runtime(self.runtime, self.apptainer_path)
-        resolved_image = prepare_container_image(runtime, self.image)
+        runtime_cmd = detect_runtime(self.apptainer_path)
+        resolved_image = prepare_container_image("apptainer", self.image)
 
         mount_arg = f"{workdir}:/App"
-        if runtime == "docker":
-            runtime_args = ["--rm", "--cpus", str(nproc), "--env", f"NGPB_NPROC={nproc}"]
-            base_cmd = [
-                runtime_cmd,
-                "run",
-                *runtime_args,
-                "-v",
-                mount_arg,
-                "-w",
-                "/App",
-                resolved_image,
-            ]
-        else:
-            base_cmd = [
-                runtime_cmd,
-                "exec",
-                *(self.exec_args or []),
-                "--pwd",
-                "/App",
-                "--bind",
-                mount_arg,
-                resolved_image,
-                "mpirun",
-                "-np",
-                str(nproc),
-            ]
+        base_cmd = [
+            runtime_cmd,
+            "exec",
+            *(self.exec_args or []),
+            "--pwd",
+            "/App",
+            "--bind",
+            mount_arg,
+            resolved_image,
+            "mpirun",
+            "-np",
+            str(nproc),
+        ]
 
         command = base_cmd + [ngpb_binary, "--prmfile", str(prm_f)]
         if self.extra_args:
@@ -87,7 +73,7 @@ class ContainerBackend:
             stream_output=self.stream_output,
         )
 
-        digest = container_digest(runtime, resolved_image)
+        digest = container_digest(resolved_image)
         candidates = [
             workdir / "phi_surf.txt",
             workdir / "phi_nodes.txt",

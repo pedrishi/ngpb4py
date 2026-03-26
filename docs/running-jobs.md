@@ -91,7 +91,6 @@ customization points are:
 runner = NgpbRunner(
     nproc=16,
     ngpb_binary="ngpb",
-    container_runtime="apptainer",
     container_exec_args=["--nv"],
     container_extra_args=["--debug"],
 )
@@ -99,9 +98,7 @@ runner = NgpbRunner(
 
 - `container_exec_args` are inserted into the runtime's `exec` invocation
 - `container_extra_args` are injected earlier in the full runtime command
-- `container_runtime` can be set to `docker`, `apptainer`, or `singularity`
-- `container_image` can be a Docker image reference, a local `.sif`, or a
-  remote `.sif` URL
+- `container_image` can be a local `.sif` or a remote `.sif` URL
 
 ## Operational Guidance
 

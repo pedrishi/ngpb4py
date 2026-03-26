@@ -21,7 +21,6 @@ class NgpbRunner:
     container_image: str = (
         "https://github.com/concept-lab/NextGenPB/releases/download/NextGenPB_v1.0.0/NextGenPB.sif"
     )
-    container_runtime: str | None = "apptainer"
     apptainer_path: str | None = None
     container_extra_args: list[str] | None = None
     container_exec_args: list[str] | None = None
@@ -53,14 +52,9 @@ class NgpbRunner:
         input_paths = [str(prm_path), *(str(path) for path in staged_paths.values())]
         _LOGGER.debug("Input paths: %s", ", ".join(input_paths))
 
-        _LOGGER.debug(
-            "Creating container backend with image=%s runtime=%s",
-            self.container_image,
-            self.container_runtime,
-        )
+        _LOGGER.debug("Creating container backend with image=%s", self.container_image)
         backend = ContainerBackend(
             image=self.container_image,
-            runtime=self.container_runtime,
             apptainer_path=self.apptainer_path,
             extra_args=self.container_extra_args,
             exec_args=self.container_exec_args,

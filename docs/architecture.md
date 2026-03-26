@@ -32,14 +32,15 @@ flowchart LR
 - an optional `container_digest`
 
 This keeps orchestration, parsing, and provenance in `NgpbRunner` while
-allowing the container runtime and image to vary by environment.
+allowing the container image and Apptainer executable path to vary by
+environment.
 
 ## Container Backend Notes
 
 The container backend:
 
-- auto-detects `apptainer`, `singularity`, or `docker`
-- downloads and caches remote SIF images for Apptainer-like runtimes
+- auto-detects `apptainer` or uses a configured absolute executable path
+- downloads and caches remote SIF images for Apptainer
 - mounts the run directory into the container
 - captures stdout and stderr to files in the run directory
 
@@ -55,7 +56,7 @@ covers:
 
 - the Python API and its behavior
 - the files and log sections parsed by the wrapper
-- container runtime and image configuration
+- Apptainer execution and container image configuration
 
 For solver-specific scientific semantics and full input modeling, refer to the
 upstream NextGenPB project and tutorial.

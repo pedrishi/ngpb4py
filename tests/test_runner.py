@@ -321,7 +321,6 @@ def test_runner_passes_custom_apptainer_path_to_container_backend():
 
     backend = ContainerBackend(
         image=runner.container_image,
-        runtime=runner.container_runtime,
         apptainer_path=runner.apptainer_path,
         extra_args=runner.container_extra_args,
         exec_args=runner.container_exec_args,
@@ -331,34 +330,15 @@ def test_runner_passes_custom_apptainer_path_to_container_backend():
     assert backend.apptainer_path == custom_path
 
 
-def test_runner_passes_custom_runtime_and_image_to_container_backend():
-    runner = NgpbRunner(
-        container_runtime="docker", container_image="ghcr.io/example/nextgenpb:latest"
-    )
-
-    backend = ContainerBackend(
-        image=runner.container_image,
-        runtime=runner.container_runtime,
-        apptainer_path=runner.apptainer_path,
-        extra_args=runner.container_extra_args,
-        exec_args=runner.container_exec_args,
-    )
-
-    assert backend.runtime == "docker"
-    assert backend.image == "ghcr.io/example/nextgenpb:latest"
-
-
 def test_runner_passes_custom_sif_to_container_backend():
     sif_path = "/tmp/custom-nextgenpb.sif"
-    runner = NgpbRunner(container_runtime="apptainer", container_image=sif_path)
+    runner = NgpbRunner(container_image=sif_path)
 
     backend = ContainerBackend(
         image=runner.container_image,
-        runtime=runner.container_runtime,
         apptainer_path=runner.apptainer_path,
         extra_args=runner.container_extra_args,
         exec_args=runner.container_exec_args,
     )
 
-    assert backend.runtime == "apptainer"
     assert backend.image == sif_path

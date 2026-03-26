@@ -10,7 +10,7 @@ from ngpb4py.helpers.download_image import download_cached_image
 
 
 def prepare_container_image(runtime: str, image: str) -> str:
-    if runtime not in {"apptainer", "singularity"}:
+    if runtime != "apptainer":
         return image
     if not is_remote_image(image):
         return image
@@ -36,39 +36,14 @@ def is_remote_image(image: str) -> bool:
     return scheme in {"http", "https"}
 
 
-def detect_runtime(
-    runtime: str | None = None, apptainer_path: str | None = None
-) -> tuple[str, str]:
-    if not runtime:
-        if apptainer_path:
-            validate_apptainer_path(apptainer_path)
-            runtime = "apptainer"
-        elif shutil.which("apptainer"):
-            runtime = "apptainer"
-        elif shutil.which("singularity"):
-            runtime = "singularity"
-        elif shutil.which("docker"):
-            runtime = "docker"
-        else:
-            raise RuntimeError("No container runtime detected (docker or apptainer)")
-    runtime_cmd = resolve_runtime_command(runtime, apptainer_path)
-    return runtime, runtime_cmd
-
-
-def resolve_runtime_command(runtime: str, apptainer_path: str | None = None) -> str:
-    if runtime == "docker" and not shutil.which("docker"):
-        raise RuntimeError("Docker runtime requested but docker was not found in PATH")
-    if runtime == "docker":
-        return "docker"
-    if runtime in {"apptainer", "singularity"}:
-        if apptainer_path:
-            validate_apptainer_path(apptainer_path)
-            return apptainer_path
-        runtime_cmd = shutil.which(runtime)
-        if runtime_cmd:
-            return runtime_cmd
-        raise RuntimeError(f"{runtime} runtime requested but {runtime} was not found in PATH")
-    raise ValueError(f"Unsupported runtime: {runtime}")
+def detect_runtime(apptainer_path: str | None = None) -> str:
+    if apptainer_path:
+        validate_apptainer_path(apptainer_path)
+        return apptainer_path
+    runtime_cmd = shutil.which("apptainer")
+    if runtime_cmd:
+        return runtime_cmd
+    raise RuntimeError("Apptainer runtime was not found in PATH")
 
 
 def validate_apptainer_path(apptainer_path: str) -> None:
@@ -133,15 +108,9 @@ def stream_pipe(pipe, destination_file, destination_stream) -> None:
         destination_stream.flush()
 
 
-def container_digest(runtime: str, image: str) -> str | None:
+def container_digest(image: str) -> str | None:
     try:
-        if runtime == "docker":
-            output = subprocess.check_output(
-                ["docker", "image", "inspect", "--format", "{{.Id}}", image],
-                stderr=subprocess.DEVNULL,
-            )
-            return output.decode(errors="replace").strip() or None
-        if runtime in {"apptainer", "singularity"} and Path(image).exists():
+        if Path(image).exists():
             output = subprocess.check_output(["sha256sum", image], stderr=subprocess.DEVNULL)
             return output.decode(errors="replace").split()[0]
     except Exception:
