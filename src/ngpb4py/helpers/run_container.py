@@ -115,14 +115,3 @@ def stream_pipe(pipe, destination_file, destination_stream) -> None:
         destination_file.flush()
         destination_stream.write(line)
         destination_stream.flush()
-
-
-def container_digest(image: str) -> str | None:
-    """Return the SHA-256 digest for a local container image when available."""
-    try:
-        if Path(image).exists():
-            output = subprocess.check_output(["sha256sum", image], stderr=subprocess.DEVNULL)
-            return output.decode(errors="replace").split()[0]
-    except Exception:
-        return None
-    return None

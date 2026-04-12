@@ -7,12 +7,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .helpers.run_container import (
-    container_digest,
-    detect_runtime,
-    execute_command,
-    prepare_container_image,
-)
+from .helpers.run_container import detect_runtime, execute_command, prepare_container_image
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,7 +20,6 @@ class ExecutionResult:
     stdout_path: Path
     stderr_path: Path
     output_paths: list[Path] | None = None
-    container_digest: str | None = None
     provenance: dict[str, str] = field(default_factory=dict)
 
 
@@ -80,7 +74,6 @@ class ContainerBackend:
             stream_output=self.stream_output,
         )
 
-        digest = container_digest(resolved_image)
         candidates = [
             workdir / "phi_surf.txt",
             workdir / "phi_nodes.txt",
@@ -92,12 +85,10 @@ class ContainerBackend:
             stdout_path=stdout_path,
             stderr_path=stderr_path,
             output_paths=existing_outputs,
-            container_digest=digest,
             provenance=_collect_provenance(
                 command=command,
                 nproc=nproc,
                 backend_name=self.name,
-                container_digest=digest,
                 ngpb_binary=ngpb_binary,
                 collect_version=collect_version,
             ),
@@ -108,14 +99,11 @@ def _collect_provenance(
     command: list[str],
     nproc: int,
     backend_name: str,
-    container_digest: str | None,
     ngpb_binary: str,
     collect_version: bool = True,
 ) -> dict[str, str]:
     """Collect reproducibility metadata for a backend execution."""
     provenance = {"backend": backend_name, "nproc": str(nproc), "command": " ".join(command)}
-    if container_digest:
-        provenance["container_digest"] = container_digest
     if collect_version:
         version = _detect_ngpb_version(ngpb_binary)
         if version:

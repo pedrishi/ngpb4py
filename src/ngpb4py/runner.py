@@ -88,8 +88,6 @@ class NgpbRunner:
                     "nproc": str(self.nproc),
                     "command": " ".join(exec_result.command),
                 }
-                if exec_result.container_digest:
-                    provenance["container_digest"] = exec_result.container_digest
             provenance["run_id"] = run_id
             _LOGGER.debug("Collected provenance entries: %d", len(provenance))
 
