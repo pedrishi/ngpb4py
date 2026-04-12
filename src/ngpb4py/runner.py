@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 import shutil
+import tempfile
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any
@@ -30,19 +31,24 @@ class NgpbRunner:
     apptainer_path: str | None = None
     container_extra_args: list[str] | None = None
     container_exec_args: list[str] | None = None
-    verbosity: int = 3
+    verbosity: int = 1
+    collect_version: bool = False
+    _backend: ContainerBackend | None = field(default=None, init=False, repr=False)
 
     def run(
         self,
         config: NgpbConfig | dict[str, Any],
         workdir: str | PathLike[str] | None = None,
-        collect_version: bool = True,
+        collect_version: bool | None = None,
         verbose: int | None = None,
         keep_files: bool = False,
     ) -> NgpbResult:
         """Run NextGenPB for a configuration and return parsed results."""
         config = _coerce_config(config)
         effective_verbose = self.verbosity if verbose is None else verbose
+        effective_collect_version = (
+            self.collect_version if collect_version is None else collect_version
+        )
         _configure_logging(effective_verbose)
 
         _LOGGER.info("Starting NextGenPB run")
@@ -60,14 +66,7 @@ class NgpbRunner:
         input_paths = [str(prm_path), *(str(path) for path in staged_paths.values())]
         _LOGGER.debug("Input paths: %s", ", ".join(input_paths))
 
-        _LOGGER.debug("Creating container backend with image=%s", self.container_image)
-        backend = ContainerBackend(
-            image=self.container_image,
-            apptainer_path=self.apptainer_path,
-            extra_args=self.container_extra_args,
-            exec_args=self.container_exec_args,
-        )
-
+        backend = self._get_backend()
         backend.stream_output = effective_verbose >= 3
         _LOGGER.info("Running backend %s with %d process(es)", backend.name, self.nproc)
         cleanup_workdir = not keep_files
@@ -77,7 +76,7 @@ class NgpbRunner:
                 workdir=run_workdir,
                 nproc=self.nproc,
                 ngpb_binary=self.ngpb_binary,
-                collect_version=collect_version,
+                collect_version=effective_collect_version,
             )
             _LOGGER.info("Backend execution completed")
 
@@ -103,7 +102,6 @@ class NgpbRunner:
                 output_paths=output_paths,
                 provenance=provenance,
             )
-            _LOGGER.info("Parsed %d documented log section(s)", result.log.section_count())
             if output_paths:
                 _LOGGER.info("Collected %d output file(s)", len(output_paths))
             _LOGGER.info("NextGenPB run finished")
@@ -116,6 +114,33 @@ class NgpbRunner:
             if cleanup_workdir:
                 shutil.rmtree(run_workdir)
                 _LOGGER.debug("Removed workdir for run_id=%s", run_id)
+
+    def close(self) -> None:
+        """Release any persistent backend resources held by the runner."""
+        if self._backend is None:
+            return
+        self._backend.close()
+        self._backend = None
+
+    def __enter__(self) -> NgpbRunner:
+        """Enter a context manager that automatically closes backend resources."""
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """Ensure persistent backend resources are closed on context exit."""
+        del exc_type, exc, tb
+        self.close()
+
+    def _get_backend(self) -> ContainerBackend:
+        if self._backend is None:
+            _LOGGER.debug("Creating container backend with image=%s", self.container_image)
+            self._backend = ContainerBackend(
+                image=self.container_image,
+                apptainer_path=self.apptainer_path,
+                extra_args=self.container_extra_args,
+                exec_args=self.container_exec_args,
+            )
+        return self._backend
 
 
 def _coerce_config(config: NgpbConfig | dict[str, Any]) -> NgpbConfig:
@@ -142,7 +167,7 @@ def _create_run_workdir(scratch_dir: Path) -> tuple[str, Path]:
 def _resolve_scratch_dir(workdir: str | PathLike[str] | None) -> Path:
     """Resolve the scratch parent directory for a run."""
     if workdir is None:
-        return Path.cwd().resolve()
+        return (Path(tempfile.gettempdir()) / "ngpb4py").resolve()
 
     scratch_dir = Path(workdir).expanduser()
     if not scratch_dir.is_absolute():

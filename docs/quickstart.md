@@ -6,7 +6,7 @@
 from ngpb4py import NgpbConfig, NgpbRunner
 
 config = NgpbConfig.from_prm("examples/exercise1/options.prm")
-runner = NgpbRunner(nproc=4, verbosity=1)
+runner = NgpbRunner(nproc=4)
 result = runner.run(config=config)
 
 print(result.log.energies.total_electrostatic_energy_kt)

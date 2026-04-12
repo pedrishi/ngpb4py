@@ -167,3 +167,66 @@ def test_ngpb_result_parses_known_output_files(tmp_path):
     assert result.parsed_outputs["phi_nodes.txt"].coordinates == [[4.0, 5.0, 6.0], [8.0, 9.0, 10.0]]
     assert result.parsed_outputs["phi_nodes.txt"].potentials == [7.0, 11.0]
     assert "other.txt" not in result.parsed_outputs
+
+
+def test_ngpb_result_parses_log_lazily(tmp_path, monkeypatch):
+    stdout_path = tmp_path / "stdout.log"
+    stderr_path = tmp_path / "stderr.log"
+    stdout_text = Path("tests/data/sample.log").read_text()
+    stdout_path.write_text(stdout_text)
+    stderr_path.write_text("")
+
+    calls: list[str] = []
+    original_parse_log = __import__("ngpb4py.result", fromlist=["parse_log"]).parse_log
+
+    def fake_parse_log(text):
+        calls.append(text)
+        return original_parse_log(text)
+
+    monkeypatch.setattr("ngpb4py.result.parse_log", fake_parse_log)
+
+    result = NgpbResult.from_logs(
+        run_id="test-run",
+        scratch_dir=tmp_path,
+        workdir=tmp_path,
+        kept_files=True,
+        command=["ngpb"],
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        output_paths=[],
+        provenance={"backend": "test"},
+    )
+
+    assert calls == []
+    assert result.metrics["mesh.elements"] == 492472
+    assert len(calls) == 1
+    assert result.log.grid is not None
+    assert result.log.grid.total_nodes == 473299
+    assert len(calls) == 1
+
+
+def test_ngpb_result_preserves_output_text_for_lazy_parsing(tmp_path):
+    stdout_path = tmp_path / "stdout.log"
+    stderr_path = tmp_path / "stderr.log"
+    stdout_path.write_text("")
+    stderr_path.write_text("")
+
+    phi_surf_path = tmp_path / "phi_surf.txt"
+    phi_surf_path.write_text("0.0 1.0 2.0 3.0\n1.5 2.5 3.5 4.5\n")
+
+    result = NgpbResult.from_logs(
+        run_id="test-run",
+        scratch_dir=tmp_path,
+        workdir=tmp_path,
+        kept_files=False,
+        command=["ngpb"],
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        output_paths=[phi_surf_path],
+        provenance={"backend": "test"},
+    )
+
+    phi_surf_path.unlink()
+
+    assert result.parsed_outputs["phi_surf.txt"].coordinates == [[0.0, 1.0, 2.0], [1.5, 2.5, 3.5]]
+    assert result.parsed_outputs["phi_surf.txt"].potentials == [3.0, 4.5]

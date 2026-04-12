@@ -14,6 +14,9 @@ result = NgpbRunner(nproc=8).run(config=config)
 `workdir` is treated as a scratch parent directory, not the final run directory.
 Each call to `run()` creates a unique child directory inside it.
 
+When `workdir` is omitted, `ngpb4py` now uses `/tmp/ngpb4py` by default so
+short runs avoid the overhead of staging files in the current working tree.
+
 ```python
 result = NgpbRunner().run(config=config, workdir="scratch", keep_files=True)
 print(result.scratch_dir)
@@ -22,6 +25,17 @@ print(result.workdir)
 
 This makes concurrent runs safer because they do not overwrite each other's
 files.
+
+## Persistent Container Reuse
+
+`NgpbRunner` now reuses a warm Apptainer instance across multiple `run()` calls.
+Use `close()` or a context manager to release it explicitly:
+
+```python
+with NgpbRunner(nproc=8) as runner:
+    result1 = runner.run(config=config1)
+    result2 = runner.run(config=config2)
+```
 
 ## Verbosity
 
@@ -38,6 +52,9 @@ Verbosity levels:
 - `1`: high-level progress messages
 - `2`: debug logging from the wrapper
 - `3`: debug logging plus streamed backend output
+
+The default runner verbosity is `1`, which avoids streamed backend output
+unless you opt in.
 
 ## Container Options
 

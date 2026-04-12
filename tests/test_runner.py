@@ -129,8 +129,9 @@ def test_runner_defaults_workdir_to_current_directory(tmp_path, monkeypatch):
 
     result = runner.run(config=make_empty_config(), collect_version=False, keep_files=True)
 
-    assert result.scratch_dir == tmp_path.resolve()
-    assert result.workdir.parent == tmp_path.resolve()
+    expected_scratch_dir = Path("/tmp/ngpb4py").resolve()
+    assert result.scratch_dir == expected_scratch_dir
+    assert result.workdir.parent == expected_scratch_dir
     assert result.workdir.exists()
 
 
@@ -369,6 +370,90 @@ def test_runner_verbose_override_updates_existing_handler_level(monkeypatch):
 
     runner.run(config=make_empty_config(), workdir="/tmp", collect_version=False, verbose=3)
     assert verbose._LOGGER.handlers[0].level == verbose.logging.DEBUG
+
+
+def test_runner_uses_low_overhead_defaults(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_run(self, prm_f, workdir, nproc, ngpb_binary, collect_version=True):
+        del prm_f, workdir, nproc, ngpb_binary
+        captured["collect_version"] = collect_version
+        captured["stream_output"] = self.stream_output
+        stdout_path = tmp_path / "ngpb.stdout.log"
+        stderr_path = tmp_path / "ngpb.stderr.log"
+        stdout_path.write_text("")
+        stderr_path.write_text("")
+        return ExecutionResult(
+            command=["ngpb", "--prmfile", "ngpb.prm"],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            output_paths=[],
+        )
+
+    monkeypatch.setattr(ContainerBackend, "run", fake_run)
+
+    runner = NgpbRunner()
+    runner.run(config=make_empty_config(), workdir=str(tmp_path))
+
+    assert captured["collect_version"] is False
+    assert captured["stream_output"] is False
+
+
+def test_runner_reuses_container_backend_between_runs(monkeypatch, tmp_path):
+    backend_ids: list[int] = []
+
+    def fake_run(self, prm_f, workdir, nproc, ngpb_binary, collect_version=True):
+        del prm_f, workdir, nproc, ngpb_binary, collect_version
+        backend_ids.append(id(self))
+        stdout_path = tmp_path / f"{len(backend_ids)}.stdout.log"
+        stderr_path = tmp_path / f"{len(backend_ids)}.stderr.log"
+        stdout_path.write_text("")
+        stderr_path.write_text("")
+        return ExecutionResult(
+            command=["ngpb", "--prmfile", "ngpb.prm"],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            output_paths=[],
+        )
+
+    monkeypatch.setattr(ContainerBackend, "run", fake_run)
+
+    runner = NgpbRunner()
+    runner.run(config=make_empty_config(), workdir=str(tmp_path), keep_files=True)
+    runner.run(config=make_empty_config(), workdir=str(tmp_path), keep_files=True)
+
+    assert len(set(backend_ids)) == 1
+
+
+def test_runner_close_releases_backend_instance(monkeypatch):
+    closed_backend_ids: list[int] = []
+
+    def fake_close(self):
+        closed_backend_ids.append(id(self))
+
+    monkeypatch.setattr(ContainerBackend, "close", fake_close)
+
+    runner = NgpbRunner()
+    backend = runner._get_backend()
+
+    runner.close()
+
+    assert closed_backend_ids == [id(backend)]
+    assert runner._backend is None
+
+
+def test_runner_context_manager_closes_backend(monkeypatch):
+    closed_backend_ids: list[int] = []
+
+    def fake_close(self):
+        closed_backend_ids.append(id(self))
+
+    monkeypatch.setattr(ContainerBackend, "close", fake_close)
+
+    with NgpbRunner() as runner:
+        backend = runner._get_backend()
+
+    assert closed_backend_ids == [id(backend)]
 
 
 def test_runner_passes_custom_apptainer_path_to_container_backend():

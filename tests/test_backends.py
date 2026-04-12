@@ -43,10 +43,11 @@ def test_container_command_building(tmp_path, monkeypatch):
     prmfile = tmp_path / "ngpb.prm"
     prmfile.write_text("solver.max_iterations = 1\n")
 
-    captured = {}
+    captured_commands: list[list[str]] = []
 
     def fake_run(command, cwd, stdout, stderr, check):
-        captured["command"] = command
+        del cwd, stdout, stderr, check
+        captured_commands.append(command)
         return subprocess.CompletedProcess(command, 0)
 
     def fake_check_output(command, stderr=None):
@@ -62,20 +63,27 @@ def test_container_command_building(tmp_path, monkeypatch):
     backend = ContainerBackend(image="/tmp/NextGenPB.sif")
     backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
 
-    assert captured["command"][0:11] == [
+    start_command, exec_command = captured_commands
+    instance_name = start_command[-1]
+
+    assert start_command[0:6] == [
+        "/usr/bin/apptainer",
+        "instance",
+        "start",
+        "--bind",
+        f"{tmp_path.parent}:/App",
+        "/tmp/NextGenPB.sif",
+    ]
+    assert exec_command[0:6] == [
         "/usr/bin/apptainer",
         "exec",
         "--pwd",
-        "/App",
-        "--bind",
-        f"{tmp_path}:/App",
-        "/tmp/NextGenPB.sif",
-        "mpirun",
-        "-np",
-        "1",
+        f"/App/{tmp_path.name}",
+        f"instance://{instance_name}",
         "ngpb",
     ]
-    assert captured["command"][-2:] == ["--prmfile", str(prmfile)]
+    assert "mpirun" not in exec_command
+    assert exec_command[-2:] == ["--prmfile", prmfile.name]
 
 
 def test_apptainer_remote_image_download_with_progress(tmp_path, monkeypatch):
@@ -104,15 +112,17 @@ def test_apptainer_remote_image_download_with_progress(tmp_path, monkeypatch):
         def isatty(self):
             return True
 
-    captured = {}
+    captured_commands: list[list[str]] = []
+    captured_urls: list[str] = []
     fake_stderr = FakeStderr()
 
     def fake_urlopen(url):
-        captured["url"] = url
+        captured_urls.append(url)
         return FakeResponse()
 
     def fake_run(command, cwd, stdout, stderr, check):
-        captured["command"] = command
+        del cwd, stdout, stderr, check
+        captured_commands.append(command)
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setenv("NGPB_CONTAINER_CACHE_DIR", str(tmp_path / "cache"))
@@ -130,8 +140,8 @@ def test_apptainer_remote_image_download_with_progress(tmp_path, monkeypatch):
     backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
 
     local_image = tmp_path / "cache" / "NextGenPB.sif"
-    assert captured["url"] == "https://example.org/NextGenPB.sif"
-    assert str(local_image) in captured["command"]
+    assert captured_urls == ["https://example.org/NextGenPB.sif"]
+    assert str(local_image) in captured_commands[0]
     assert local_image.exists()
     assert "Downloading container image" in fake_stderr.getvalue()
     assert "100%" in fake_stderr.getvalue()
@@ -141,10 +151,11 @@ def test_apptainer_exec_args_are_inserted_after_exec(tmp_path, monkeypatch):
     prmfile = tmp_path / "ngpb.prm"
     prmfile.write_text("solver.max_iterations = 1\n")
 
-    captured = {}
+    captured: list[list[str]] = []
 
     def fake_run(command, cwd, stdout, stderr, check):
-        captured["command"] = command
+        del cwd, stdout, stderr, check
+        captured.append(command)
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr("subprocess.run", fake_run)
@@ -158,20 +169,30 @@ def test_apptainer_exec_args_are_inserted_after_exec(tmp_path, monkeypatch):
     backend = ContainerBackend(image="/tmp/NextGenPB.sif", exec_args=["--nv", "--containall"])
     backend.run(prm_f=prmfile, workdir=tmp_path, nproc=2, ngpb_binary="ngpb")
 
-    assert captured["command"][0].endswith("apptainer")
-    assert captured["command"][1:12] == [
+    start_command, exec_command = captured
+    instance_name = start_command[-1]
+
+    assert start_command[0].endswith("apptainer")
+    assert start_command[1:8] == [
+        "instance",
+        "start",
+        "--nv",
+        "--containall",
+        "--bind",
+        f"{tmp_path.parent}:/App",
+        "/tmp/NextGenPB.sif",
+    ]
+    assert exec_command[1:7] == [
         "exec",
         "--nv",
         "--containall",
         "--pwd",
-        "/App",
-        "--bind",
-        f"{tmp_path}:/App",
-        "/tmp/NextGenPB.sif",
-        "mpirun",
-        "-np",
-        "2",
+        f"/App/{tmp_path.name}",
+        f"instance://{instance_name}",
     ]
+    assert exec_command[-6:-3] == ["mpirun", "-np", "2"]
+    assert exec_command[-3] == "ngpb"
+    assert exec_command[-2:] == ["--prmfile", prmfile.name]
 
 
 def test_apptainer_uses_custom_absolute_path_when_not_on_path(tmp_path, monkeypatch):
@@ -183,10 +204,11 @@ def test_apptainer_uses_custom_absolute_path_when_not_on_path(tmp_path, monkeypa
     custom_apptainer.write_text("#!/bin/sh\n")
     custom_apptainer.chmod(custom_apptainer.stat().st_mode | 0o111)
 
-    captured = {}
+    captured: list[list[str]] = []
 
     def fake_run(command, cwd, stdout, stderr, check):
-        captured["command"] = command
+        del cwd, stdout, stderr, check
+        captured.append(command)
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr("subprocess.run", fake_run)
@@ -195,8 +217,10 @@ def test_apptainer_uses_custom_absolute_path_when_not_on_path(tmp_path, monkeypa
     backend = ContainerBackend(apptainer_path=str(custom_apptainer), image="/tmp/NextGenPB.sif")
     backend.run(prm_f=prmfile, workdir=tmp_path, nproc=1, ngpb_binary="ngpb")
 
-    assert captured["command"][0] == str(custom_apptainer)
-    assert captured["command"][1] == "exec"
+    assert captured[0][0] == str(custom_apptainer)
+    assert captured[0][1:3] == ["instance", "start"]
+    assert captured[1][0] == str(custom_apptainer)
+    assert captured[1][1] == "exec"
 
 
 def test_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
@@ -204,7 +228,10 @@ def test_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
     prmfile.write_text("solver.max_iterations = 1\n")
 
     def fake_run(command, cwd, stdout, stderr, check):
-        return subprocess.CompletedProcess(command, 7)
+        del cwd, stdout, stderr, check
+        return subprocess.CompletedProcess(
+            command, 0 if command[1:3] == ["instance", "start"] else 7
+        )
 
     monkeypatch.setattr("subprocess.run", fake_run)
     monkeypatch.setattr(
@@ -229,6 +256,10 @@ def test_streaming_container_run_raises_on_nonzero_exit(tmp_path, monkeypatch):
             return 9
 
     monkeypatch.setattr("subprocess.Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda command, cwd, stdout, stderr, check: subprocess.CompletedProcess(command, 0),
+    )
     monkeypatch.setattr(
         "shutil.which", lambda name: "/usr/bin/apptainer" if name == "apptainer" else None
     )
@@ -276,3 +307,38 @@ def test_apptainer_remote_image_download_is_locked(tmp_path, monkeypatch):
     thread_two.join(timeout=2)
 
     assert call_count == 1
+
+
+def test_container_backend_reuses_instance_for_same_scratch_dir(tmp_path, monkeypatch):
+    prmfile = tmp_path / "ngpb.prm"
+    prmfile.write_text("solver.max_iterations = 1\n")
+
+    workdir_one = tmp_path / "run-one"
+    workdir_two = tmp_path / "run-two"
+    workdir_one.mkdir()
+    workdir_two.mkdir()
+
+    captured: list[list[str]] = []
+
+    def fake_run(command, cwd, stdout, stderr, check):
+        del cwd, stdout, stderr, check
+        captured.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "shutil.which", lambda name: "/usr/bin/apptainer" if name == "apptainer" else None
+    )
+
+    backend = ContainerBackend(image="/tmp/NextGenPB.sif")
+    backend.run(
+        prm_f=prmfile, workdir=workdir_one, nproc=1, ngpb_binary="ngpb", collect_version=False
+    )
+    backend.run(
+        prm_f=prmfile, workdir=workdir_two, nproc=1, ngpb_binary="ngpb", collect_version=False
+    )
+    backend.close()
+
+    assert [command[1:3] for command in captured].count(["instance", "start"]) == 1
+    assert [command[1] for command in captured].count("exec") == 2
+    assert captured[-1][1:3] == ["instance", "stop"]

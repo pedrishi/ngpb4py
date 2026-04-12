@@ -6,15 +6,16 @@
 
 - run identifiers and file locations
 - the command used to invoke the backend
-- parsed log sections
-- parsed supported output files
-- simple derived metrics
+- lazily parsed log sections
+- lazily parsed supported output files
+- lazily derived metrics
 - provenance metadata
 
 ## Parsed Log Sections
 
-The parsed log is available at `result.log`. When present in the solver output,
-the following sections are mapped to typed objects:
+The parsed log is available at `result.log`. It is parsed on first access, and
+when present in the solver output the following sections are mapped to typed
+objects:
 
 - `result.log.system`
 - `result.log.domain`
@@ -33,7 +34,8 @@ energy = result.log.energies.total_electrostatic_energy_kt
 
 ## Parsed Output Files
 
-If these files are produced by NextGenPB, `ngpb4py` parses them automatically:
+If these files are produced by NextGenPB, `ngpb4py` parses them the first time
+you access `result.parsed_outputs`:
 
 - `phi_surf.txt`
 - `phi_nodes.txt`
